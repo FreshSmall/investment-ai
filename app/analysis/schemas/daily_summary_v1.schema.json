@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "daily_summary_v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["summary", "highlights", "tomorrow_watch"],
+  "properties": {
+    "summary": {"type": "string", "minLength": 10, "maxLength": 500},
+    "highlights": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["event_id", "point"],
+        "properties": {
+          "event_id": {"type": "string", "pattern": "^[0-9a-f]{16}$"},
+          "point": {"type": "string", "minLength": 4}
+        }
+      }
+    },
+    "tomorrow_watch": {"type": "array", "minItems": 1, "maxItems": 5, "items": {"type": "string", "minLength": 4}}
+  }
+}

@@ -1,0 +1,72 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "event_analysis_v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "summary", "facts", "interpretations", "hypotheses", "affected_industries",
+    "affected_companies", "causal_chain", "supporting_evidence", "counter_evidence",
+    "uncertainty", "follow_up_questions"
+  ],
+  "properties": {
+    "summary": {"type": "string", "minLength": 10, "maxLength": 300},
+    "facts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["text", "source_event_id"],
+        "properties": {
+          "text": {"type": "string", "minLength": 4},
+          "source_event_id": {"type": "string", "pattern": "^[0-9a-f]{16}$"}
+        }
+      }
+    },
+    "interpretations": {"type": "array", "items": {"type": "string", "minLength": 4}},
+    "hypotheses": {"type": "array", "items": {"type": "string", "minLength": 4}},
+    "affected_industries": {
+      "type": "array",
+      "items": {"type": "string", "enum": ["__SECTORS__"]}
+    },
+    "affected_companies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "code", "channel"],
+        "properties": {
+          "name": {"type": "string", "minLength": 2},
+          "code": {"type": ["string", "null"], "pattern": "^[0-9]{6}$"},
+          "channel": {"type": "string", "minLength": 4}
+        }
+      }
+    },
+    "causal_chain": {"type": "array", "items": {"type": "string", "minLength": 2}, "maxItems": 12},
+    "supporting_evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["text", "source_event_id"],
+        "properties": {
+          "text": {"type": "string", "minLength": 4},
+          "source_event_id": {"type": "string", "pattern": "^[0-9a-f]{16}$"}
+        }
+      }
+    },
+    "counter_evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["text", "source_event_id"],
+        "properties": {
+          "text": {"type": "string", "minLength": 4},
+          "source_event_id": {"type": "string", "pattern": "^[0-9a-f]{16}$"}
+        }
+      }
+    },
+    "uncertainty": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 4}},
+    "follow_up_questions": {"type": "array", "minItems": 1, "maxItems": 3, "items": {"type": "string", "minLength": 4}}
+  }
+}
