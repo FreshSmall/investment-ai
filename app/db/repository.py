@@ -182,6 +182,21 @@ class Repository:
         stmt = select(AnalysisRow).where(AnalysisRow.event_id == event_id, AnalysisRow.strategy == strategy)
         return self._s.scalars(stmt).first()
 
+    def get_analysis_for_date(self, report_date: date, strategy: str) -> Optional[AnalysisRow]:
+        stmt = select(AnalysisRow).where(
+            AnalysisRow.report_date == report_date, AnalysisRow.strategy == strategy
+        )
+        return self._s.scalars(stmt).first()
+
+    def list_recent_analyses(self, strategy: str, limit: int = 30) -> List[AnalysisRow]:
+        stmt = (
+            select(AnalysisRow)
+            .where(AnalysisRow.strategy == strategy)
+            .order_by(AnalysisRow.created_at.desc())
+            .limit(limit)
+        )
+        return list(self._s.scalars(stmt))
+
     def analyses_for_events(self, event_ids: Sequence[str], strategy: str) -> Dict[str, AnalysisRow]:
         if not event_ids:
             return {}

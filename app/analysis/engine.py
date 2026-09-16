@@ -58,14 +58,19 @@ class AnalysisEngine:
         except BudgetExceeded as e:
             return self._fail(strategy.name, ErrorKind.BUDGET_EXCEEDED, str(e))
 
-        # 2) result cache (idempotency): same event+strategy already analyzed
+        # 2) result cache (idempotency): same event/aggregate + strategy already analyzed
+        existing = None
         if event_id:
             existing = self._repo.get_analysis_for_event(event_id, strategy.name)
-            if existing is not None:
-                return AnalysisOutcome(
-                    strategy=strategy.name, ok=True,
-                    result=existing.result_json, analysis_id=existing.id, cached=True,
-                )
+        elif report_date:
+            lookup = getattr(self._repo, "get_analysis_for_date", None)
+            if lookup is not None:
+                existing = lookup(report_date, strategy.name)
+        if existing is not None:
+            return AnalysisOutcome(
+                strategy=strategy.name, ok=True,
+                result=existing.result_json, analysis_id=existing.id, cached=True,
+            )
 
         tier_cfg = self._cfg.llm.tiers[strategy.tier.value]
         system, user, prompt_version = render_prompt(strategy.prompt_file, prompt_ctx)
