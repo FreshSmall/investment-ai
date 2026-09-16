@@ -1,0 +1,46 @@
+# Thesis 种子：首次导入 theses 表；此后以 DB 为准。
+theses:
+  - id: ai-demand-growth
+    title: AI 数据中心建设持续增长
+    core_hypothesis: |
+      全球 AI 算力需求处于多年上行周期，数据中心建设（CAPEX、GPU/ASIC、服务器、光模块、
+      先进封装）将持续增长，带动 A 股算力产业链公司收入与盈利预期上修。
+    falsification_conditions:
+      - {id: capex-decline, condition: 北美头部云厂商资本开支连续两个季度同比下降, metric: 云厂商季度 CAPEX}
+      - {id: gpu-decline, condition: 全球 GPU/ASIC 出货量连续两个季度环比下滑, metric: GPU 出货量}
+      - {id: guidance-cut, condition: 头部算力公司下修全年收入指引, metric: 公司业绩指引}
+    key_metrics: [云厂商季度 CAPEX, GPU 出货量, AI 服务器出货量, 800G 光模块需求, HBM 合约价]
+    related_sectors: [ai_semiconductor]
+
+  - id: hbm-cycle
+    title: HBM 供需紧张延续至下一代平台
+    core_hypothesis: |
+      HBM 供给受制于先进封装产能，需求随新一代 GPU 平台放量，供需紧张将延续，
+      价格与稼动率维持高位，相关封测/设备/材料公司受益。
+    falsification_conditions:
+      - {id: hbm-price-drop, condition: HBM 合约价连续两个季度环比下跌, metric: HBM 合约价}
+      - {id: capacity-oversupply, condition: 主要厂商大幅扩产后稼动率跌破 80%, metric: 先进封装稼动率}
+    key_metrics: [HBM 合约价, 先进封装产能与稼动率, 存储厂资本开支, 新平台 HBM 用量]
+    related_sectors: [ai_semiconductor]
+
+  - id: power-infrastructure
+    title: AI 带动电力基础设施景气上行
+    core_hypothesis: |
+      数据中心用电量高增长外溢至电网设备（变压器、配电、UPS/HVDC、储能），
+      国内出海与国内电网投资共振，电力设备板块盈利预期持续上修。
+    falsification_conditions:
+      - {id: dc-slowdown, condition: 数据中心新增装机增速显著放缓, metric: 数据中心新增装机}
+      - {id: grid-capex-down, condition: 国内电网投资增速转负或海外订单同比下滑, metric: 电网投资额/海外订单}
+    key_metrics: [国内电网投资完成额, 变压器出口金额, 数据中心新增装机, HVDC/UPS 渗透率]
+    related_sectors: [power_energy]
+
+  - id: humanoid-robot-growth
+    title: 人形机器人进入量产爬坡元年
+    core_hypothesis: |
+      头部厂商人形机器人 2026-2027 年进入小批量量产爬坡，核心零部件（丝杠、减速器、
+      灵巧手、传感器）国产供应商将先于整机厂获得收入弹性。
+    falsification_conditions:
+      - {id: production-delay, condition: 头部厂商量产时间表推迟超过两个季度, metric: 量产时间表}
+      - {id: order-shortfall, condition: 核心零部件公司机器人业务收入连续两季低于预期, metric: 零部件公司机器人营收}
+    key_metrics: [头部厂商量产计划, 核心零部件定点/订单, 单机 BOM 成本下降曲线]
+    related_sectors: [robotics]
