@@ -51,7 +51,7 @@ class ReportStep(Step):
         except OSError as e:
             log.error("vault 写入失败（DB 不回滚，render --all 可重建）", extra={"ctx": {"error": str(e)[:200]}})
             return StepResult(
-                name=self.name, ok=True,  # 报告失败必须可见但不阻塞 run 收口
+                name=self.name, ok=False,  # 渲染失败 → run=partial（架构 12.3），但不抛异常阻塞收口
                 stats={"report_error": str(e)[:200]},
             )
 

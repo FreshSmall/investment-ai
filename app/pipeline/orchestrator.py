@@ -72,6 +72,8 @@ class Orchestrator:
             try:
                 result = step.run(ctx)
                 stats.update(result.stats)
+                if not result.ok:  # 软失败：本步完成但核心产出受损（如 vault 写失败）→ partial
+                    failed_steps.append(step.name)
                 self._log.info("step done", extra={"ctx": {"step": step.name, "ok": result.ok}})
             except StepError as e:
                 failed_steps.append(step.name)

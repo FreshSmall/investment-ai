@@ -68,6 +68,9 @@ class MockLLMProvider(LLMProvider):
         else:
             raw = self._default_response(strategy, req.user)
 
+        if isinstance(raw, dict) and "__error__" in raw:  # 模拟 provider 级失败（超时/5xx）
+            return LLMResult(ok=False, model=req.model, error=str(raw["__error__"]))
+
         if isinstance(raw, dict):
             data, text = raw, None
         else:
