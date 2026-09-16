@@ -1,0 +1,24 @@
+# 行业定义：L0 关键词过滤 + Obsidian 渲染骨架的唯一来源。代码中禁止硬编码行业词表。
+# render_name 即 Obsidian 文件名（Industries/{render_name}.md）；sections 是长文档骨架分节。
+
+sectors:
+  ai_semiconductor:
+    name: AI / 半导体
+    render_name: AI-Semiconductor
+    keywords:
+      [AI, GPU, ASIC, HBM, 光模块, CPO, PCB, 先进封装, 半导体设备, 半导体材料, 数据中心, 算力, 芯片, 晶圆, 存储]
+    sections: [overview, supply_demand, catalysts, risks, metrics, changelog]
+
+  power_energy:
+    name: 电力 / 电网 / 储能
+    render_name: Power-Energy
+    keywords:
+      [数据中心电力, 电网, 变压器, 储能, UPS, 电力电子, 特高压, 配电网, 虚拟电厂, 换电]
+    sections: [overview, supply_demand, catalysts, risks, metrics, changelog]
+
+  robotics:
+    name: 机器人 / 人形机器人
+    render_name: Robotics
+    keywords:
+      [人形机器人, 具身智能, 减速器, 丝杠, 灵巧手, 传感器, 伺服, 运动控制, 机器人]
+    sections: [overview, supply_demand, catalysts, risks, metrics, changelog]
