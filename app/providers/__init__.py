@@ -12,4 +12,6 @@ from app.providers.base import (  # noqa: F401
 
 # Import for registration side effects.
 from app.providers.news import mock as _mock_news  # noqa: F401
+from app.providers.news import cls as _cls_news  # noqa: F401
+from app.providers.news import eastmoney as _em_news  # noqa: F401
 from app.providers.llm import mock as _llm_mock  # noqa: F401
