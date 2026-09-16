@@ -22,6 +22,7 @@ class LLMRequest:
     max_tokens: int = 2000
     timeout_seconds: int = 60
     response_json: bool = True
+    strategy: str = ""             # analysis strategy name (for routing/metering)
 
 
 @dataclass

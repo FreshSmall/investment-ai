@@ -1,0 +1,16 @@
+{
+  "events": [
+    {"source": "cls", "source_id": "1001", "title": "英伟达发布新一代GPU架构 HBM用量翻倍", "content": "英伟达宣布新一代 GPU 平台全面搭载 HBM4，单卡 HBM 用量翻倍，配套光模块升级至 1.6T，先进封装产能预约已排至明年。算力产业链景气度进一步确认。", "url": "https://cls.cn/telegraph/1001", "published_at": "2026-09-17T09:32:00"},
+    {"source": "cls", "source_id": "1002", "title": "国家电网公布特高压与配电网新一轮投资计划", "content": "国家电网披露年度投资计划，特高压与配电网投资同比明显增长，变压器、电力设备招标规模扩大，数据中心配套供电项目加速。", "url": "https://cls.cn/telegraph/1002", "published_at": "2026-09-17T10:15:00"},
+    {"source": "cls", "source_id": "1003", "title": "特斯拉Optimus人形机器人量产节奏提前", "content": "供应链消息称 Optimus 人形机器人小批量产线调试完成，行星滚柱丝杠与灵巧手部件订单可见度提升，减速器供应商已获定点。", "url": "https://cls.cn/telegraph/1003", "published_at": "2026-09-17T11:02:00"},
+    {"source": "cls", "source_id": "1004", "title": "某消费公司发布秋季新品饮料系列", "content": "该公司推出三款低糖饮品，主打线下渠道铺货，营销费用同比增加。", "url": "https://cls.cn/telegraph/1004", "published_at": "2026-09-17T11:30:00"},
+    {"source": "cls", "source_id": "1005", "title": "国内半导体设备公司获晶圆厂大额订单", "content": "某半导体设备公司公告与头部晶圆厂签订设备采购框架协议，金额超市场预期，国产化率持续提升。", "url": "https://cls.cn/telegraph/1005", "published_at": "2026-09-17T13:20:00"},
+    {"source": "cls", "source_id": "1006", "title": "坏时间戳样本（应被丢弃）", "content": "此条 published_at 为空，用于测试 normalize 对脏数据的容错。", "url": null, "published_at": null},
+    {"source": "eastmoney", "source_id": "2001", "title": "英伟达发布新一代GPU架构 HBM用量翻倍", "content": "英伟达宣布新一代 GPU 平台全面搭载 HBM4，单卡 HBM 用量翻倍，配套光模块升级至 1.6T，先进封装产能预约已排至明年。算力产业链景气度进一步确认。", "url": "https://finance.eastmoney.com/a/2001.html", "published_at": "2026-09-17T09:40:00"},
+    {"source": "eastmoney", "source_id": "2002", "title": "多省出台数据中心配储与峰谷电价新政", "content": "多省能源局发布数据中心配储新政，新建大型数据中心需配置储能系统，峰谷电价价差扩大，利好储能与 UPS 厂商。", "url": "https://finance.eastmoney.com/a/2002.html", "published_at": "2026-09-17T12:05:00"},
+    {"source": "eastmoney", "source_id": "2003", "title": "具身智能产业大会召开 多家企业发布新品", "content": "具身智能产业大会上多家公司发布机器人新品，六维力传感器与伺服系统需求预期上修，运动控制方案商获关注。", "url": "https://finance.eastmoney.com/a/2003.html", "published_at": "2026-09-17T14:10:00"},
+    {"source": "cls", "source_id": "1007", "title": "华东最大数据中心电力配套项目开工", "content": "华东某超大规模数据中心电力配套工程开工，含变压器扩容与自建储能电站，数据中心电力需求外溢效应显现。", "url": "https://cls.cn/telegraph/1007", "published_at": "2026-09-17T15:00:00"},
+    {"source": "cls", "source_id": "1008", "title": "PCB龙头宣布AI服务器板产能扩建", "content": "公司公告拟投资扩建高多层 AI 服务器 PCB 产能，预计明年下半年投产，客户覆盖头部算力厂商。", "url": "https://cls.cn/telegraph/1008", "published_at": "2026-09-17T16:20:00"},
+    {"source": "eastmoney", "source_id": "2004", "title": "算力租赁价格企稳 部分区域小幅上涨", "content": "多地智算中心算力租赁报价企稳，部分热门区域出现小幅上涨，反映 AI 算力供需仍偏紧。", "url": "https://finance.eastmoney.com/a/2004.html", "published_at": "2026-09-17T17:45:00"}
+  ]
+}
