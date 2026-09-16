@@ -12,11 +12,15 @@ pipeline:
 
 llm:
   tiers:
-    L1: {model: glm-4.7-flash, temperature: 0.1, max_tokens: 1000}
+    # L1 便宜档：当前 .env 为 DeepSeek key → deepseek-flash（约¥1/M in）。
+    # 切 GLM 免费档时改回 glm-4.7-flash 并在 .env 换 LLM_BASE_URL/KEY。
+    L1: {model: deepseek-flash, temperature: 0.1, max_tokens: 1000}
     L2: {model: deepseek-chat, temperature: 0.3, max_tokens: 2500}
-    L3: {model: glm-5, temperature: 0.3, max_tokens: 4000}
+    L3: {model: deepseek-v4-pro, temperature: 0.3, max_tokens: 4000}
   prices:                     # ¥/百万 token（2026-09 参考价；调整只改此文件）
-    glm-4.7-flash: {input_per_m: 0.0, output_per_m: 0.0}
+    deepseek-flash: {input_per_m: 1.0, output_per_m: 2.0}
     deepseek-chat: {input_per_m: 4.0, output_per_m: 16.0}
+    deepseek-v4-pro: {input_per_m: 8.0, output_per_m: 24.0}
+    glm-4.7-flash: {input_per_m: 0.0, output_per_m: 0.0}
     glm-5: {input_per_m: 8.0, output_per_m: 24.0}
   daily_budget_cny: 10.0      # 当日 LLM 成本熔断线

@@ -116,3 +116,26 @@ def test_db_unreachable_fast_exit() -> None:
     summary = Orchestrator([s1]).run_daily(make_ctx(repo))
     assert summary.status == RunStatus.DB_UNREACHABLE
     assert not s1.executed
+
+
+def test_unknown_exception_converges_to_partial() -> None:
+    """真实运行暴露的缺陷回归：LLMClientError 等未知异常必须收敛为步骤失败+终态（TASK-028）。"""
+
+    class WeirdStep(Step):
+        name = "weird"
+
+        def __init__(self) -> None:
+            self.executed = False
+
+        def run(self, ctx) -> StepResult:
+            self.executed = True
+            raise RuntimeError("LLM HTTP 400: 模型名不支持")
+
+    repo = FakeRepo()
+    after = OkStep("after")
+    summary = Orchestrator([WeirdStep(), after]).run_daily(make_ctx(repo))
+    assert summary.status == RunStatus.PARTIAL
+    assert summary.failed_steps == ["weird"]
+    assert not after.executed
+    assert "RuntimeError" in summary.stats["step_errors"]["weird"]
+    assert repo.finished[0][1] == RunStatus.PARTIAL.value  # run 有终态，不再卡 running

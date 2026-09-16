@@ -80,6 +80,14 @@ class Orchestrator:
                 stats.setdefault("step_errors", {})[step.name] = str(e)[:300]
                 self._log.warning("step failed, aborting remaining", extra={"ctx": {"step": step.name, "error": str(e)[:200]}})
                 break
+            except Exception as e:  # 未知异常（如 LLMClientError 4xx）同样收敛为步骤级失败，保证 run 有终态
+                failed_steps.append(step.name)
+                stats.setdefault("step_errors", {})[step.name] = "%s: %s" % (type(e).__name__, str(e)[:250])
+                self._log.error(
+                    "step unexpected error, aborting remaining",
+                    extra={"ctx": {"step": step.name, "error": "%s: %s" % (type(e).__name__, str(e)[:200])}},
+                )
+                break
 
         status = RunStatus.SUCCESS if not failed_steps else RunStatus.PARTIAL
         finished = clock.now()
