@@ -86,6 +86,12 @@ class Orchestrator:
         stats["success_count"] = stats.get("events_new", 0)
         stats["failure_count"] = len(failed_steps)
         stats["duration_sec"] = round((finished - started).total_seconds(), 1)
+        engine = getattr(ctx, "engine", None)
+        if engine is not None:  # LLM 用量与成本（指令十九）
+            stats["llm_calls"] = engine.total_calls
+            stats["input_tokens"] = engine.total_input_tokens
+            stats["output_tokens"] = engine.total_output_tokens
+            stats["estimated_cost_cny"] = round(engine.total_cost_cny, 4)
         try:
             ctx.repo.finish_run(run_id, status, finished, stats)
         except SQLAlchemyError as e:  # DB died mid-run: report but don't crash

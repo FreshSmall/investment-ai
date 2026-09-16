@@ -38,6 +38,11 @@ class AnalysisEngine:
         self._cfg = app_cfg
         self._budget = budget
         self._log = get_logger("engine")
+        # run 级用量累计（Pipeline Execution Report 数据源，arch §11）
+        self.total_calls = 0
+        self.total_input_tokens = 0
+        self.total_output_tokens = 0
+        self.total_cost_cny = 0.0
 
     def run(
         self,
@@ -88,6 +93,10 @@ class AnalysisEngine:
                 strategy=strategy.name,
             )
             result = self._llm.complete_json(req)
+            self.total_calls += 1
+            self.total_input_tokens += result.input_tokens
+            self.total_output_tokens += result.output_tokens
+            self.total_cost_cny += result.cost_cny
             if not result.ok:
                 last_error = result.error or "provider error"
                 if attempt == 2:
