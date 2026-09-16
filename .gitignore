@@ -1,0 +1,23 @@
+# --- secrets / env ---
+*.env
+.env
+!.env.example
+
+# --- python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pytest_cache/
+.ruff_cache/
+
+# --- runtime artifacts ---
+logs/*
+!logs/.gitkeep
+data/raw_cache/*
+!data/raw_cache/.gitkeep
+
+# --- macOS / IDE ---
+.DS_Store
+.idea/
+.vscode/
