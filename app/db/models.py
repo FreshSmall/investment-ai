@@ -56,6 +56,7 @@ class AnalysisRow(Base):
     id: Mapped[int] = mapped_column(BIGINT, primary_key=True, autoincrement=True)
     event_id: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
     report_date: Mapped[Optional[date]] = mapped_column(DATE, nullable=True)
+    thesis_id: Mapped[str] = mapped_column(String(64), nullable=False, server_default=text("''"))  # V0.2: thesis_review 逐 thesis 缓存键；'' 哨兵=非 thesis 聚合（NULL 不参与唯一判重，故用空串）
     strategy: Mapped[str] = mapped_column(String(32), nullable=False)
     model: Mapped[str] = mapped_column(String(64), nullable=False)
     prompt_version: Mapped[str] = mapped_column(String(16), nullable=False)
@@ -68,7 +69,7 @@ class AnalysisRow(Base):
 
     __table_args__ = (
         Index("uk_anal", "event_id", "strategy", "prompt_version", unique=True),
-        Index("uk_agg", "report_date", "strategy", "prompt_version", unique=True),
+        Index("uk_agg", "report_date", "thesis_id", "strategy", "prompt_version", unique=True),
         Index("idx_strategy", "strategy", "created_at"),
     )
 
@@ -141,3 +142,15 @@ class RunRow(Base):
     __table_args__ = (
         Index("idx_date", "report_date", "status"),
     )
+
+
+class CompanyRow(Base):
+    """V0.2: watched companies (seed from config/companies.yaml)."""
+
+    __tablename__ = "companies"
+
+    code: Mapped[str] = mapped_column(String(12), primary_key=True)
+    name: Mapped[str] = mapped_column(String(64), nullable=False)
+    sector: Mapped[Optional[str]] = mapped_column(String(64))
+    watched: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))  # tinyint
+    profile: Mapped[Optional[dict]] = mapped_column(JSON)   # {"text": "..."} 前端展示与 prompt 共用

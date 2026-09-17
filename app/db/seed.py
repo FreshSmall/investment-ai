@@ -1,4 +1,4 @@
-"""Idempotent thesis seeding from config/theses.yaml (first-run bootstrap)."""
+"""Idempotent seeding from config YAML (first-run bootstrap): theses + companies."""
 
 from __future__ import annotations
 
@@ -48,9 +48,22 @@ def seed_theses(session: Session, path: Optional[Path] = None) -> int:
     return inserted
 
 
+def seed_companies(session: Session, path: Optional[Path] = None) -> int:
+    """Upsert companies from config/companies.yaml (V0.2). Returns row count."""
+    from app.db.repository import Repository
+
+    path = path or (CONFIG_DIR / "companies.yaml")
+    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    companies = data.get("companies", [])
+    count = Repository(session).seed_companies(companies)
+    get_logger("seed").info("seed companies", extra={"ctx": {"rows": count}})
+    return count
+
+
 if __name__ == "__main__":
     from app.db.engine import get_session_factory
 
     with get_session_factory()() as s:
         count = seed_theses(s)
         print("seeded %d theses" % count)
+        print("seeded %d companies" % seed_companies(s))

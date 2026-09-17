@@ -1,0 +1,25 @@
+# 自选股种子（V0.2）：首次导入 companies 表；此后以 DB 为准（watched 开关可停用单只）。
+# profile 供 company_impact 策略做上下文（定位/核心暴露/传导环节），宜人工维护。
+companies:
+  - {code: "300308", name: 中际旭创, sector: ai_semiconductor, watched: true,
+     profile: "光模块龙头，800G/1.6T 主力供应商，直接暴露于海外云厂商 AI CAPEX 与光模块需求节奏。"}
+  - {code: "002463", name: 沪电股份, sector: ai_semiconductor, watched: true,
+     profile: "AI 服务器高多层 PCB 核心供应商，受益于服务器/交换机出货与高价值量占比提升。"}
+  - {code: "601138", name: 工业富联, sector: ai_semiconductor, watched: true,
+     profile: "AI 服务器整机组装龙头，GPU 服务器代工占比高，跟踪北美云厂商订单与整机毛利率。"}
+  - {code: "002371", name: 北方华创, sector: ai_semiconductor, watched: true,
+     profile: "国产半导体设备平台型龙头，暴露于国内晶圆厂资本开支与国产化率提升。"}
+
+  - {code: "600089", name: 特变电工, sector: power_energy, watched: true,
+     profile: "变压器+输变电总包龙头，暴露于电网投资、变压器出海与数据中心配套用电。"}
+  - {code: "002028", name: 思源电气, sector: power_energy, watched: true,
+     profile: "一次设备民企龙头，海外订单占比高，跟踪海外电网投资与数据中心配电需求。"}
+  - {code: "300274", name: 阳光电源, sector: power_energy, watched: true,
+     profile: "光伏逆变器与储能系统龙头，暴露于全球储能装机需求与数据中心储能配套。"}
+
+  - {code: "688017", name: 绿的谐波, sector: robotics, watched: true,
+     profile: "谐波减速器国产龙头，人形机器人放量受益者，跟踪机器人订单占比与产能建设。"}
+  - {code: "603728", name: 鸣志电器, sector: robotics, watched: true,
+     profile: "空心杯电机/控制电机龙头，人形机器人灵巧手核心部件候选供应商。"}
+  - {code: "601689", name: 拓普集团, sector: robotics, watched: true,
+     profile: "Tier-1 平台型供应商，直线执行器/机器人总成布局，跟踪人形机器人定点进展。"}

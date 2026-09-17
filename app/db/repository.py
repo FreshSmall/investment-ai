@@ -18,10 +18,13 @@ from app.core import clock
 from app.core.log import get_logger
 from app.db.models import (
     AnalysisRow,
+    CompanyRow,
     EventRow,
     ReportRow,
     RunRow,
+    ThesisEvidenceRow,
     ThesisRow,
+    ThesisVersionRow,
 )
 from app.domain.event import EventStatus, Importance, NormalizedEvent
 from app.domain.report import RunStatus
@@ -156,6 +159,7 @@ class Repository:
         result: Dict[str, Any],
         event_id: Optional[str] = None,
         report_date: Optional[date] = None,
+        thesis_id: str = "",
         input_tokens: int = 0,
         output_tokens: int = 0,
         cost_cny: float = 0.0,
@@ -167,11 +171,13 @@ class Repository:
         Default: UNIQUE hit returns the existing row (result cache). With
         ``refresh=True`` (aggregate strategies on a twice-a-day schedule) the
         existing row is updated in place — the day's summary must reflect the
-        full day, and rows never duplicate.
+        full day, and rows never duplicate. ``thesis_id`` narrows the aggregate
+        key for per-thesis strategies (thesis_review); '' for everything else.
         """
         stmt = select(AnalysisRow).where(
             AnalysisRow.strategy == strategy,
             AnalysisRow.prompt_version == prompt_version,
+            AnalysisRow.thesis_id == thesis_id,
             *( [AnalysisRow.event_id == event_id] if event_id else [AnalysisRow.event_id.is_(None)] ),
             *( [AnalysisRow.report_date == report_date] if report_date else [AnalysisRow.report_date.is_(None)] ),
         )
@@ -188,6 +194,7 @@ class Repository:
         row = AnalysisRow(
             event_id=event_id,
             report_date=report_date,
+            thesis_id=thesis_id,
             strategy=strategy,
             model=model,
             prompt_version=prompt_version,
@@ -205,9 +212,14 @@ class Repository:
         stmt = select(AnalysisRow).where(AnalysisRow.event_id == event_id, AnalysisRow.strategy == strategy)
         return self._s.scalars(stmt).first()
 
-    def get_analysis_for_date(self, report_date: date, strategy: str) -> Optional[AnalysisRow]:
+    def get_analysis_for_date(
+        self, report_date: date, strategy: str, thesis_id: str = ""
+    ) -> Optional[AnalysisRow]:
         stmt = select(AnalysisRow).where(
-            AnalysisRow.report_date == report_date, AnalysisRow.strategy == strategy
+            AnalysisRow.report_date == report_date,
+            AnalysisRow.strategy == strategy,
+            AnalysisRow.thesis_id == thesis_id,
+            AnalysisRow.event_id.is_(None),
         )
         return self._s.scalars(stmt).first()
 
@@ -281,6 +293,166 @@ class Repository:
         if active_only:
             stmt = stmt.where(ThesisRow.status == "active")
         return list(self._s.scalars(stmt))
+
+    # ---------------- companies (V0.2) ----------------
+
+    def list_companies(self, watched_only: bool = True) -> List[CompanyRow]:
+        stmt = select(CompanyRow).order_by(CompanyRow.code)
+        if watched_only:
+            stmt = stmt.where(CompanyRow.watched == 1)
+        return list(self._s.scalars(stmt))
+
+    def seed_companies(self, companies: Sequence[Dict[str, Any]]) -> int:
+        """Idempotent seed from config/companies.yaml. Returns rows inserted."""
+        inserted = 0
+        for c in companies:
+            stmt = mysql_insert(CompanyRow).values(
+                code=c["code"], name=c["name"], sector=c.get("sector"),
+                watched=1 if c.get("watched", True) else 0,
+                profile={"text": c.get("profile", "")},
+            )
+            stmt = stmt.on_duplicate_key_update(
+                name=stmt.inserted.name, sector=stmt.inserted.sector,
+                profile=stmt.inserted.profile,
+            )
+            self._s.execute(stmt)
+            inserted += 1
+        self._s.commit()
+        return inserted
+
+    # ---------------- thesis review (V0.2) ----------------
+
+    def save_thesis_evidence(
+        self,
+        thesis_id: str,
+        review_date: date,
+        items: List[Dict[str, Any]],
+        analysis_id: Optional[int] = None,
+    ) -> int:
+        """Idempotent evidence write (PK thesis_id+event_id+review_date).
+
+        ``items``: [{"event_id", "direction", "weight", "note"}]. Returns
+        rows actually inserted (0 on re-run = idempotent).
+        """
+        inserted = 0
+        for it in items:
+            # 幂等：联合主键命中则更新 weight/note，不重复插行
+            stmt = mysql_insert(ThesisEvidenceRow).values(
+                thesis_id=thesis_id,
+                event_id=it["event_id"],
+                review_date=review_date,
+                analysis_id=analysis_id,
+                direction=it["direction"],
+                weight=it.get("weight", "weak"),
+                note=(it.get("note") or "")[:1000] or None,
+            )
+            stmt = stmt.on_duplicate_key_update(weight=stmt.inserted.weight, note=stmt.inserted.note)
+            self._s.execute(stmt)
+            inserted += 1
+        self._s.commit()
+        return inserted
+
+    def day_direction(self, thesis_id: str, review_date: date) -> Optional[str]:
+        """Dominant direction of one review day: 'supporting'/'contradicting'/None.
+
+        A day counts as contradicting only when strong opposite evidence
+        outnumbers strong supporting evidence (arch §7.4 — Devil Advocate
+        output is capped at 'weak', so it can never flip a day alone).
+        """
+        stmt = select(ThesisEvidenceRow).where(
+            ThesisEvidenceRow.thesis_id == thesis_id,
+            ThesisEvidenceRow.review_date == review_date,
+        )
+        rows = list(self._s.scalars(stmt))
+        if not rows:
+            return None
+        strong_con = sum(1 for r in rows if r.direction == "contradicting" and r.weight == "strong")
+        strong_sup = sum(1 for r in rows if r.direction == "supporting" and r.weight == "strong")
+        if strong_con > strong_sup:
+            return "contradicting"
+        if strong_sup > 0:
+            return "supporting"
+        return "neutral"
+
+    def consecutive_contradicting_days(self, thesis_id: str, before_date: date, window: int = 3) -> int:
+        """Length of the contradicting-day streak ending at ``before_date`` (inclusive)."""
+        streak = 0
+        d = before_date
+        for _ in range(window):
+            if self.day_direction(thesis_id, d) != "contradicting":
+                break
+            streak += 1
+            d -= timedelta(days=1)
+        return streak
+
+    def apply_thesis_review(
+        self,
+        thesis_id: str,
+        review_date: date,
+        direction: str,
+        evidence_items: List[Dict[str, Any]],
+        analysis_id: Optional[int] = None,
+        falsification_triggered: bool = False,
+        weakened_streak: int = 3,
+    ) -> Dict[str, Any]:
+        """Persist one thesis_review outcome. Status transitions are CODE rules
+        (arch §7.4) — the LLM only labels direction, never flips status.
+
+        Transitions:
+        - falsification_triggered            -> falsified (terminal, human restore)
+        - N consecutive contradicting days   -> weakened
+        - otherwise                          -> status unchanged
+        Returns {"status_changed": bool, "new_status": str, "evidence_rows": int}.
+        """
+        self.save_thesis_evidence(thesis_id, review_date, evidence_items, analysis_id)
+        thesis = self._s.get(ThesisRow, thesis_id)
+        result = {"status_changed": False, "new_status": thesis.status if thesis else "", "evidence_rows": len(evidence_items)}
+        if thesis is None:
+            return result
+
+        new_status: Optional[str] = None
+        reason = ""
+        if falsification_triggered and thesis.status in ("active", "weakened"):
+            new_status, reason = "falsified", "证伪条件触发"
+        elif (
+            thesis.status == "active"
+            and direction == "contradicting"
+            and self.consecutive_contradicting_days(thesis_id, review_date, weakened_streak) >= weakened_streak
+        ):
+            new_status, reason = "weakened", "连续 %d 日强反证" % weakened_streak
+
+        if new_status is not None:
+            self._transition_thesis(thesis, new_status, changed_by="system", reason=reason)
+            result.update(status_changed=True, new_status=new_status)
+        return result
+
+    def _transition_thesis(self, thesis: ThesisRow, new_status: str, changed_by: str, reason: str) -> None:
+        """Bump version + snapshot the previous state (thesis_versions)."""
+        snapshot = {
+            "id": thesis.id, "title": thesis.title, "status": new_status,
+            "core_hypothesis": thesis.core_hypothesis,
+            "falsification_conditions": thesis.falsification_conditions,
+            "key_metrics": thesis.key_metrics, "reason": reason,
+        }
+        thesis.status = new_status
+        thesis.version += 1
+        thesis.updated_at = clock.now()
+        self._s.add(ThesisVersionRow(
+            thesis_id=thesis.id, version=thesis.version, snapshot=snapshot, changed_by=changed_by,
+        ))
+        self._s.commit()
+
+    def list_thesis_evidence(self, thesis_id: str, limit: int = 50) -> List[ThesisEvidenceRow]:
+        stmt = (
+            select(ThesisEvidenceRow)
+            .where(ThesisEvidenceRow.thesis_id == thesis_id)
+            .order_by(ThesisEvidenceRow.review_date.desc(), ThesisEvidenceRow.created_at.desc())
+            .limit(limit)
+        )
+        return list(self._s.scalars(stmt))
+
+    def get_thesis(self, thesis_id: str) -> Optional[ThesisRow]:
+        return self._s.get(ThesisRow, thesis_id)
 
     def day_metrics(self, report_date: date) -> Dict[str, Any]:
         """Aggregate stats for the pipeline execution report (observability §11)."""
