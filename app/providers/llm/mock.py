@@ -161,4 +161,34 @@ class MockLLMProvider(LLMProvider):
                 dict(f, source_event_id=eid) for f in _EVENT_ANALYSIS_TEMPLATE["counter_evidence"]
             ]
             return payload
+        if strategy == "market_review":
+            return {
+                "market_summary": "mock 市场复盘：指数放量上行，成长风格占优，科技板块与基本面催化互相印证。",
+                "sector_moves": [
+                    {"sector": "半导体", "direction": "up", "note": "订单催化驱动"},
+                    {"sector": "房地产", "direction": "down", "note": "政策预期回落"},
+                ],
+                "style_note": "量能温和放大，风险偏好回升但未过热。",
+                "risk_flags": ["缩量回落风险"],
+                "tomorrow_watch": ["关注算力板块持续性"],
+            }
+        if strategy == "industry_update":
+            # 前两个节标记更新，其余 changed=false 原样返回
+            sections = []
+            for name in ("overview", "supply_demand", "catalysts", "risks", "metrics"):
+                changed = name in ("overview", "catalysts")
+                sections.append({
+                    "name": name,
+                    "content": ("行业景气度上行：AI 需求驱动订单与产能双扩张（mock 更新）。"
+                                if changed else "（待首次更新）"),
+                    "changed": changed,
+                    **({"based_on_event_ids": [eid] for eid in _EVENT_ID_RE.findall(user_text)[:1]} if changed else {}),
+                })
+            evs = _EVENT_ID_RE.findall(user_text)
+            return {
+                "sections": sections,
+                "changelog_rows": (
+                    [{"change": "催化剂：下游订单信号增强", "evidence_event_id": evs[0]}] if evs else []
+                ),
+            }
         return {"ok": True, "strategy": strategy}

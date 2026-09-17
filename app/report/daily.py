@@ -70,6 +70,16 @@ def build_daily_model(repo: Repository, report_date: date, summary: Optional[Dic
             "summary": result.get("summary", ""),
         })
 
+    # V0.3: market review board (snapshot + LLM review)
+    market: Dict[str, Any] = {}
+    snapshot = repo.get_snapshot(report_date)
+    if snapshot:
+        market["indices"] = snapshot.get("indices") or []
+        market["sectors_top"] = snapshot.get("sectors_top") or []
+    review_row = repo.get_analysis_for_date(report_date, "market_review")
+    if review_row is not None:
+        market["review"] = review_row.result_json or {}
+
     return {
         "report_date": str(report_date),
         "summary": summary or {},
@@ -78,6 +88,7 @@ def build_daily_model(repo: Repository, report_date: date, summary: Optional[Dic
         "p1_hidden": p1_hidden,
         "thesis_updates": thesis_updates,
         "company_impacts": company_impacts,
+        "market": market,
     }
 
 

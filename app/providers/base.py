@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Callable, Dict, List, Tuple
+from typing import Any, Callable, Dict, List, Tuple
 
 from app.core.log import get_logger
 from app.domain.analysis import LLMRequest, LLMResult
@@ -36,6 +36,16 @@ class LLMProvider(ABC):
     @abstractmethod
     def complete_json(self, req: LLMRequest) -> LLMResult:
         """Call the model in JSON mode and return usage-metered result."""
+
+
+class MarketProvider(ABC):
+    """V0.3: daily market snapshot (indices + sector boards)."""
+
+    name: str = "base"
+
+    @abstractmethod
+    def fetch_daily(self, trade_date) -> Dict:
+        """Snapshot dict: {trade_date, collected_at, indices[], sectors_top[], sectors_bottom[]}."""
 
 
 NEWS_PROVIDER_REGISTRY: Dict[str, Callable[[], NewsProvider]] = {}

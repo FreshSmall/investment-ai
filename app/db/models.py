@@ -154,3 +154,12 @@ class CompanyRow(Base):
     sector: Mapped[Optional[str]] = mapped_column(String(64))
     watched: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))  # tinyint
     profile: Mapped[Optional[dict]] = mapped_column(JSON)   # {"text": "..."} 前端展示与 prompt 共用
+
+
+class DailySnapshotRow(Base):
+    """V0.3: market snapshot per trade date (indices + sector boards)."""
+
+    __tablename__ = "daily_snapshots"
+
+    trade_date: Mapped[date] = mapped_column(DATE, primary_key=True)
+    snapshot: Mapped[dict] = mapped_column(JSON, nullable=False)

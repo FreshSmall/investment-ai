@@ -58,6 +58,8 @@ def make_pipeline_ctx(session, vault_path, frozen_time=None):
     sectors = load_sectors()
     app_cfg = load_app_config()
     repo = Repository(session)
+    from app.providers.market.tencent import MockMarketProvider
+
     ctx = StepContext(
         run_id=uuid.uuid4().hex,
         report_date=date(2026, 9, 17),
@@ -68,6 +70,7 @@ def make_pipeline_ctx(session, vault_path, frozen_time=None):
         engine=AnalysisEngine(llm=llm, repo=repo, sectors=sectors, app_cfg=app_cfg, budget=BudgetGuard(1000.0)),
         news_providers=[MockNewsProvider()],
         vault_path=vault_path,
+        market_provider=MockMarketProvider(),
     )
     ctx.mock_llm = llm  # type: ignore[attr-defined]
     ctx.restore_clock = restore_clock or (lambda: None)  # type: ignore[attr-defined]

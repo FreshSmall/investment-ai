@@ -43,4 +43,21 @@ STRATEGIES = {
         prompt_file="company_impact_v1.md",
         scope="event",
     ),
+    # V0.3: market behaviour review (indices + sector boards vs fundamentals)
+    "market_review": Strategy(
+        name="market_review",
+        tier=StrategyTier.L2,
+        schema_name="market_review_v1",
+        prompt_file="market_review_v1.md",
+        scope="aggregate",
+    ),
+    # V0.3: industry long-doc section update (per-sector per-day aggregate;
+    # thesis_id column carries the sector key as the aggregate dimension)
+    "industry_update": Strategy(
+        name="industry_update",
+        tier=StrategyTier.L2,
+        schema_name="industry_update_v1",
+        prompt_file="industry_update_v1.md",
+        scope="thesis",  # refresh-in-place semantics, dimension key = sector
+    ),
 }

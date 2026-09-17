@@ -58,6 +58,11 @@ def test_daily_twice_full_idempotency(idem_env) -> None:
     llm_calls1 = ctx.mock_llm.call_count()
     report1 = (ctx.vault_path / "Daily" / "2026-09-17.md").read_text(encoding="utf-8")
     assert counts1["evidence"] >= 1  # thesis 链路确实跑过
+    # 首跑各策略调用量快照（相对断言基准，不依赖 fixtures 行业分布）
+    event_scoped = ("classification", "event_analysis", "company_impact")
+    refresh_scoped = ("daily_summary", "market_review", "thesis_review", "industry_update")
+    snap1 = {s: ctx.mock_llm.call_count(s) for s in event_scoped + refresh_scoped}
+    assert snap1["market_review"] == 1 and snap1["thesis_review"] == 4
 
     second = _run_pipeline(ctx)
     assert second.status.value == "skipped"
@@ -70,12 +75,12 @@ def test_daily_twice_full_idempotency(idem_env) -> None:
     assert third.stats["events_new"] == 0
     counts3 = _db_counts(ctx)
     assert counts3["events"] == counts1["events"]
-    assert counts3["analyses"] == counts1["analyses"]  # thesis_review 与 daily_summary 同为 refresh 原地更新不加行
+    assert counts3["analyses"] == counts1["analyses"]  # refresh 策略原地更新不加行
     assert counts3["reports"] == counts1["reports"]  # upsert 不重复
     assert counts3["evidence"] == counts1["evidence"]  # 联合主键 upsert，证据零重复
-    # 事件级分析零新调用（UNIQUE 缓存）；唯 refresh 语义策略各 +1 次：daily_summary + 4×thesis_review
-    assert ctx.mock_llm.call_count("daily_summary") == 2  # 首跑 1 + force 1
-    assert ctx.mock_llm.call_count("thesis_review") == 8  # 4 thesis × (首跑 + force)
-    total_now = ctx.mock_llm.call_count()
-    assert total_now == llm_calls1 + 1 + 4  # 综述 +1、thesis 复盘 +4，其余（含 company_impact）零新增
+    # 事件级策略（UNIQUE 缓存）调用数不变；refresh 策略恰好翻倍
+    for s in event_scoped:
+        assert ctx.mock_llm.call_count(s) == snap1[s], s
+    for s in refresh_scoped:
+        assert ctx.mock_llm.call_count(s) == snap1[s] * 2, s
     assert (ctx.vault_path / "Daily" / "2026-09-17.md").read_text(encoding="utf-8") == report1

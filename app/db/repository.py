@@ -19,6 +19,7 @@ from app.core.log import get_logger
 from app.db.models import (
     AnalysisRow,
     CompanyRow,
+    DailySnapshotRow,
     EventRow,
     ReportRow,
     RunRow,
@@ -462,6 +463,34 @@ class Repository:
 
     def get_thesis(self, thesis_id: str) -> Optional[ThesisRow]:
         return self._s.get(ThesisRow, thesis_id)
+
+    # ---------------- market snapshots (V0.3) ----------------
+
+    def upsert_snapshot(self, trade_date: date, snapshot: Dict[str, Any]) -> bool:
+        """Idempotent daily market snapshot. Returns True when inserted first time."""
+        stmt = select(DailySnapshotRow).where(DailySnapshotRow.trade_date == trade_date)
+        row = self._s.scalars(stmt).first()
+        if row is not None:
+            row.snapshot = snapshot  # 22:00 收盘后覆盖 09:00 占位（若当日已有）
+            self._s.commit()
+            return False
+        self._s.add(DailySnapshotRow(trade_date=trade_date, snapshot=snapshot))
+        self._s.commit()
+        return True
+
+    def get_snapshot(self, trade_date: date) -> Optional[Dict[str, Any]]:
+        row = self._s.get(DailySnapshotRow, trade_date)
+        return row.snapshot if row is not None else None
+
+    def get_prev_snapshot(self, before: date) -> Optional[Dict[str, Any]]:
+        stmt = (
+            select(DailySnapshotRow)
+            .where(DailySnapshotRow.trade_date < before)
+            .order_by(DailySnapshotRow.trade_date.desc())
+            .limit(1)
+        )
+        row = self._s.scalars(stmt).first()
+        return row.snapshot if row is not None else None
 
     def day_metrics(self, report_date: date) -> Dict[str, Any]:
         """Aggregate stats for the pipeline execution report (observability §11)."""

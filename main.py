@@ -74,6 +74,16 @@ def _build_ctx(report_date: _date, providers_mode: str, settings: Settings):
         news_names = app_cfg.news_providers
     news_providers, degraded = build_news_providers(news_names)
 
+    # V0.3: 行情快照源（mock 模式联动 mock market）
+    if providers_mode == "mock":
+        from app.providers.market.tencent import MockMarketProvider
+
+        market_provider = MockMarketProvider()
+    else:
+        from app.providers.market.tencent import TencentMarketProvider
+
+        market_provider = TencentMarketProvider()
+
     ctx = StepContext(
         run_id=str(uuid.uuid4()),
         report_date=report_date,
@@ -85,6 +95,7 @@ def _build_ctx(report_date: _date, providers_mode: str, settings: Settings):
         news_providers=news_providers,
         degraded_sources=degraded,
         vault_path=effective_vault_path(app_cfg, settings),
+        market_provider=market_provider,
     )
     ctx.llm = llm  # type: ignore[attr-defined]
     return ctx
@@ -95,13 +106,16 @@ def _steps():
     from app.pipeline.steps.classify import ClassifyStep
     from app.pipeline.steps.collect import CollectStep
     from app.pipeline.steps.company_impact import CompanyImpactStep
+    from app.pipeline.steps.industry_update import IndustryUpdateStep
+    from app.pipeline.steps.market import MarketStep
     from app.pipeline.steps.normalize import IngestStep
     from app.pipeline.steps.report import ReportStep
     from app.pipeline.steps.thesis_review import ThesisReviewStep
 
     return [
         CollectStep(), IngestStep(), ClassifyStep(), AnalyzeStep(),
-        CompanyImpactStep(), ThesisReviewStep(), ReportStep(),
+        MarketStep(), CompanyImpactStep(), ThesisReviewStep(),
+        IndustryUpdateStep(), ReportStep(),
     ]
 
 

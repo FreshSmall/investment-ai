@@ -270,6 +270,32 @@ def render_daily_md(model: Dict) -> str:
         lines.append("")
         lines.append("今日无 P0/P1 事件。市场与行业未见需要更新研究假设的信号。")
         lines.append("")
+    # V0.3: market review board
+    market = model.get("market") or {}
+    review = market.get("review") or {}
+    if market.get("indices") or review:
+        lines.append("## 市场复盘")
+        lines.append("")
+        if market.get("indices"):
+            idx_line = " · ".join(
+                "%s %s%%（%s 亿）" % (i.get("name", "?"), i.get("change_pct", 0), i.get("amount_yi", 0))
+                for i in market["indices"]
+            )
+            lines.append("*指数*：%s" % idx_line)
+            lines.append("")
+        if market.get("sectors_top"):
+            top_line = "、".join("%s %s%%" % (s.get("name", "?"), s.get("change_pct", 0)) for s in market["sectors_top"][:3])
+            lines.append("*领涨*：%s" % top_line)
+            lines.append("")
+        if review.get("market_summary"):
+            lines.append(review["market_summary"])
+            lines.append("")
+        if review.get("style_note"):
+            lines.append("**风格**：%s" % review["style_note"])
+            lines.append("")
+        if review.get("risk_flags"):
+            lines.append("**风险信号**：%s" % "；".join(review["risk_flags"]))
+            lines.append("")
     # V0.2: thesis review board
     thesis_updates = model.get("thesis_updates") or []
     if thesis_updates:
@@ -301,10 +327,15 @@ def render_daily_md(model: Dict) -> str:
         lines.extend("- %s" % w for w in watch)
         lines.append("")
     metrics = model.get("metrics") or {}
-    if metrics:
+    # 稳定指标白名单：token 类字段随 refresh 重跑原地更新（行业现文反馈循环），
+    # 渲染它们会破坏日报字节级确定性；token 明细在 runs.stats_json 可查
+    stable_metrics = {k: v for k, v in metrics.items() if k in (
+        "events_new_today", "by_importance", "analyses_today", "estimated_cost_cny",
+    )}
+    if stable_metrics:
         lines.append("## 运行指标")
         lines.append("")
-        for k in sorted(metrics):
-            lines.append("- %s: %s" % (k, metrics[k]))
+        for k in sorted(stable_metrics):
+            lines.append("- %s: %s" % (k, stable_metrics[k]))
         lines.append("")
     return "\n".join(lines)

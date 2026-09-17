@@ -240,3 +240,40 @@ def test_thesis_injection_replaces_placeholder() -> None:
     schema = load_schema("thesis_review_v1", None, ["my-thesis"])
     text = json.dumps(schema)
     assert "__THESES__" not in text and "my-thesis" in text
+
+
+# ---------------- market_review_v1 / industry_update_v1 (V0.3) ----------------
+
+
+def test_market_review_valid() -> None:
+    ok, errors = validate("market_review_v1", {
+        "market_summary": "指数放量上行，成长风格占优，板块与事件互相印证。",
+        "sector_moves": [{"sector": "半导体", "direction": "up", "note": "订单催化"}],
+        "style_note": "量能温和放大。",
+        "risk_flags": ["缩量回落风险"],
+        "tomorrow_watch": ["关注算力板块持续性"],
+    }, SECTORS)
+    assert ok, errors
+
+
+def test_market_review_bad_direction_rejected() -> None:
+    ok, _ = validate("market_review_v1", {
+        "market_summary": "x" * 10, "sector_moves": [{"sector": "半导体", "direction": "side", "note": "n"}],
+        "style_note": "style", "risk_flags": [], "tomorrow_watch": ["w"],
+    }, SECTORS)
+    assert not ok
+
+
+def test_industry_update_valid_and_bad_section() -> None:
+    payload = {
+        "sections": [
+            {"name": "overview", "content": "行业景气上行。", "changed": True, "based_on_event_ids": [EID]},
+            {"name": "metrics", "content": "（待首次更新）", "changed": False},
+        ],
+        "changelog_rows": [{"change": "催化剂增强", "evidence_event_id": EID}],
+    }
+    ok, errors = validate("industry_update_v1", payload, SECTORS)
+    assert ok, errors
+    payload["sections"][0]["name"] = "changelog"  # LLM 不允许动 changelog 节
+    ok2, _ = validate("industry_update_v1", payload, SECTORS)
+    assert not ok2

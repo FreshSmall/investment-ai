@@ -1,0 +1,42 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "industry_update_v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["sections", "changelog_rows"],
+  "properties": {
+    "sections": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "content", "changed"],
+        "properties": {
+          "name": {"type": "string", "enum": ["overview", "supply_demand", "catalysts", "risks", "metrics"]},
+          "content": {"type": "string", "minLength": 2, "maxLength": 1200},
+          "changed": {"type": "boolean"},
+          "based_on_event_ids": {
+            "type": "array",
+            "maxItems": 6,
+            "items": {"type": "string", "pattern": "^[0-9a-f]{16}$"}
+          }
+        }
+      }
+    },
+    "changelog_rows": {
+      "type": "array",
+      "maxItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["change", "evidence_event_id"],
+        "properties": {
+          "change": {"type": "string", "minLength": 4, "maxLength": 150},
+          "evidence_event_id": {"type": "string", "pattern": "^[0-9a-f]{16}$"}
+        }
+      }
+    }
+  }
+}
