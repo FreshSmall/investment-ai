@@ -50,8 +50,10 @@ class AnalysisEngine:
         *,
         prompt_ctx: Dict[str, Any],
         allowed_event_ids: Optional[Set[str]] = None,
+        allowed_thesis_ids: Optional[Set[str]] = None,
         event_id: Optional[str] = None,
         report_date: Optional[_date] = None,
+        thesis_id: Optional[str] = None,
     ) -> AnalysisOutcome:
         strategy = STRATEGIES[strategy_name]
         allowed = allowed_event_ids or set()
@@ -64,16 +66,14 @@ class AnalysisEngine:
             return self._fail(strategy.name, ErrorKind.BUDGET_EXCEEDED, str(e))
 
         # 2) result cache (idempotency): same event + strategy already analyzed.
-        # Aggregate strategies (daily_summary) are EXCLUDED: a day runs twice
-        # (09:00 / 22:00) and the summary must refresh to cover the full day —
+        # Aggregate/thesis strategies are EXCLUDED: a day runs twice
+        # (09:00 / 22:00) and the review must refresh to cover the full day —
         # save_analysis upserts in place, so rows never duplicate.
         existing = None
         if event_id:
             existing = self._repo.get_analysis_for_event(event_id, strategy.name)
-        elif report_date and strategy.scope != "aggregate":
-            lookup = getattr(self._repo, "get_analysis_for_date", None)
-            if lookup is not None:
-                existing = lookup(report_date, strategy.name)
+        elif report_date and strategy.scope not in ("aggregate", "thesis"):
+            existing = self._repo.get_analysis_for_date(report_date, strategy.name)
         if existing is not None:
             return AnalysisOutcome(
                 strategy=strategy.name, ok=True,
@@ -115,7 +115,7 @@ class AnalysisEngine:
                 continue
 
             data, warnings = self._scrub_hallucinated_refs(data, allowed)
-            ok, errors = validate(strategy.schema_name, data, sector_keys)
+            ok, errors = validate(strategy.schema_name, data, sector_keys, sorted(allowed_thesis_ids) if allowed_thesis_ids else None)
             if not ok:
                 last_error = "; ".join(errors)
                 if attempt == 2:
@@ -129,10 +129,11 @@ class AnalysisEngine:
                 result=data,
                 event_id=event_id,
                 report_date=report_date,
+                thesis_id=thesis_id or "",
                 input_tokens=result.input_tokens,
                 output_tokens=result.output_tokens,
                 cost_cny=result.cost_cny,
-                refresh=(strategy.scope == "aggregate"),
+                refresh=(strategy.scope in ("aggregate", "thesis")),
             )
             self._budget.add(result.cost_cny)
             return AnalysisOutcome(

@@ -1,0 +1,38 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "thesis_review_v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["thesis_id", "direction", "evidence", "falsification_triggered", "note", "next_questions"],
+  "properties": {
+    "thesis_id": {"type": "string", "enum": ["__THESES__"]},
+    "direction": {"type": "string", "enum": ["supporting", "neutral", "contradicting"]},
+    "evidence": {
+      "type": "array",
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["text", "source_event_id", "direction", "weight"],
+        "properties": {
+          "text": {"type": "string", "minLength": 4, "maxLength": 300},
+          "source_event_id": {"type": "string", "pattern": "^[0-9a-f]{16}$"},
+          "direction": {"type": "string", "enum": ["supporting", "neutral", "contradicting"]},
+          "weight": {"type": "string", "enum": ["strong", "weak"]}
+        }
+      }
+    },
+    "falsification_triggered": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["triggered", "condition_id", "reason"],
+      "properties": {
+        "triggered": {"type": "boolean"},
+        "condition_id": {"type": ["string", "null"], "maxLength": 64},
+        "reason": {"type": "string", "maxLength": 300}
+      }
+    },
+    "note": {"type": "string", "minLength": 4, "maxLength": 400},
+    "next_questions": {"type": "array", "minItems": 1, "maxItems": 3, "items": {"type": "string", "minLength": 4, "maxLength": 200}}
+  }
+}

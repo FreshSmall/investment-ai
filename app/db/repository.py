@@ -223,6 +223,15 @@ class Repository:
         )
         return self._s.scalars(stmt).first()
 
+    def analyses_for_date(self, report_date: date, strategy: str) -> List[AnalysisRow]:
+        """All rows of one aggregate/thesis strategy on a date (V0.2)."""
+        stmt = (
+            select(AnalysisRow)
+            .where(AnalysisRow.report_date == report_date, AnalysisRow.strategy == strategy)
+            .order_by(AnalysisRow.thesis_id, AnalysisRow.event_id)
+        )
+        return list(self._s.scalars(stmt))
+
     def list_recent_analyses(self, strategy: str, limit: int = 30) -> List[AnalysisRow]:
         stmt = (
             select(AnalysisRow)
@@ -329,10 +338,10 @@ class Repository:
         items: List[Dict[str, Any]],
         analysis_id: Optional[int] = None,
     ) -> int:
-        """Idempotent evidence write (PK thesis_id+event_id+review_date).
+        """Idempotent evidence write (PK thesis_id+event_id+review_date upsert).
 
-        ``items``: [{"event_id", "direction", "weight", "note"}]. Returns
-        rows actually inserted (0 on re-run = idempotent).
+        ``items``: [{"event_id", "direction", "weight", "note"}]. Returns rows
+        processed; idempotency is asserted by unchanged table row counts.
         """
         inserted = 0
         for it in items:

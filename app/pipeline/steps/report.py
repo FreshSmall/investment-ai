@@ -51,6 +51,7 @@ class ReportStep(Step):
             path = write_daily_report(
                 ctx.repo, ctx.report_date, summary, ctx.vault_path, theses, ctx.sectors,
                 p1_cap=ctx.app_cfg.pipeline.daily_p1_cap,
+                status_changes=ctx.shared.get("thesis_status_changes"),
             )
         except OSError as e:
             log.error("vault 写入失败（DB 不回滚，render --all 可重建）", extra={"ctx": {"error": str(e)[:200]}})

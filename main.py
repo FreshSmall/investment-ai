@@ -94,10 +94,15 @@ def _steps():
     from app.pipeline.steps.analyze import AnalyzeStep
     from app.pipeline.steps.classify import ClassifyStep
     from app.pipeline.steps.collect import CollectStep
+    from app.pipeline.steps.company_impact import CompanyImpactStep
     from app.pipeline.steps.normalize import IngestStep
     from app.pipeline.steps.report import ReportStep
+    from app.pipeline.steps.thesis_review import ThesisReviewStep
 
-    return [CollectStep(), IngestStep(), ClassifyStep(), AnalyzeStep(), ReportStep()]
+    return [
+        CollectStep(), IngestStep(), ClassifyStep(), AnalyzeStep(),
+        CompanyImpactStep(), ThesisReviewStep(), ReportStep(),
+    ]
 
 
 def cmd_daily(args) -> int:
@@ -186,11 +191,12 @@ def cmd_render(args) -> int:
 def cmd_thesis(args) -> int:
     from app.db.engine import get_session_factory
     from app.db.repository import Repository
-    from app.db.seed import seed_theses
+    from app.db.seed import seed_companies, seed_theses
 
     repo = Repository(get_session_factory()())
     if args.action == "seed":
         print("seeded %d theses" % seed_theses(repo._s))
+        print("seeded %d companies" % seed_companies(repo._s))
         return 0
     theses = repo.list_theses()
     if args.action == "list":

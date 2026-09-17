@@ -137,6 +137,73 @@ def ensure_skeletons(vault: Path, sectors: SectorsCfg, theses: List[Dict]) -> Li
     return created
 
 
+# ---------------- thesis long file (V0.2) ----------------
+
+_STATUS_LINE_RE = re.compile(r"^> Thesis 状态: .*$", re.MULTILINE)
+
+
+def _evidence_line(ev: Dict) -> str:
+    badge = DIRECTION_BADGES.get(ev.get("direction", "neutral"), ev.get("direction", "?"))
+    weight = "强" if ev.get("weight") == "strong" else "弱"
+    note = (ev.get("note") or "").replace("\n", " ").strip()
+    link = "[[Daily/%s#%s|%s]]" % (ev.get("review_date"), anchor(ev.get("event_id", "")), ev.get("review_date"))
+    return "- %s（%s）%s — %s" % (badge, weight, note, link)
+
+
+def write_thesis_file(vault: Path, thesis: Dict, evidence_rows: List[Dict]) -> Path:
+    """Update one Thesis long file from DB truth (arch §9).
+
+    Rewrites ONLY section bodies + the status line; human notes outside
+    sections are preserved byte-for-byte. Evidence list keeps the newest
+    20; latest_changes keeps the newest 10 (rolling window, DB retains all).
+    """
+    path = vault / "Theses" / ("%s.md" % thesis["id"])
+    text = path.read_text(encoding="utf-8") if path.exists() else thesis_skeleton(thesis)
+
+    badge = THESIS_STATUS_BADGES.get(thesis.get("status", "active"), thesis.get("status"))
+    status_line = "> Thesis 状态: %s · 本文件由 DB 渲染（render --all 可重建）" % badge
+    if _STATUS_LINE_RE.search(text):
+        text = _STATUS_LINE_RE.sub(status_line, text, count=1)
+    else:
+        text = text.replace("# %s\n" % thesis["title"], "# %s\n\n%s\n" % (thesis["title"], status_line), 1)
+
+    text = replace_section(
+        text, "hypothesis", (thesis.get("core_hypothesis") or "").strip(),
+        as_of=str(thesis.get("version", 1)),
+    )
+    text = replace_section(
+        text, "falsification",
+        "\n".join(
+            "- **%s**：%s（跟踪指标：%s）" % (c.get("id", ""), c.get("condition", ""), c.get("metric", ""))
+            for c in thesis.get("falsification_conditions") or []
+        ) or "（未定义）",
+    )
+    text = replace_section(
+        text, "metrics",
+        "\n".join("- %s" % m for m in thesis.get("key_metrics") or []) or "（未定义）",
+    )
+
+    recent = evidence_rows[:20]
+    for section, direction in (("evidence_for", "supporting"), ("evidence_against", "contradicting")):
+        rows = [e for e in recent if e.get("direction") == direction]
+        text = replace_section(
+            text, section,
+            "\n".join(_evidence_line(e) for e in rows) or "（暂无证据记录）",
+        )
+    changes = evidence_rows[:10]
+    text = replace_section(
+        text, "latest_changes",
+        "\n".join(
+            "- %s %s" % (e.get("review_date"), DIRECTION_BADGES.get(e.get("direction", "neutral"), ""))
+            + ("：{}".format((e.get("note") or "").replace("\n", " ").strip()[:80]) if e.get("note") else "")
+            for e in changes
+        ) or "（暂无变化记录）",
+    )
+
+    atomic_write(path, text)
+    return path
+
+
 # ---------------- daily report ----------------
 
 
@@ -202,6 +269,30 @@ def render_daily_md(model: Dict) -> str:
         lines.append("## 平静日")
         lines.append("")
         lines.append("今日无 P0/P1 事件。市场与行业未见需要更新研究假设的信号。")
+        lines.append("")
+    # V0.2: thesis review board
+    thesis_updates = model.get("thesis_updates") or []
+    if thesis_updates:
+        lines.append("## Thesis 复盘")
+        lines.append("")
+        for t in thesis_updates:
+            badge = DIRECTION_BADGES.get(t.get("direction"), t.get("direction", "?"))
+            status_note = "（状态变更 → %s）" % t["new_status"] if t.get("status_changed") else ""
+            lines.append("- **%s**：%s%s — %s [[Theses/%s|→]]" % (
+                t.get("title", t.get("thesis_id")), badge, status_note,
+                (t.get("note") or "").replace("\n", " ")[:120], t.get("thesis_id"),
+            ))
+        lines.append("")
+    company_impacts = model.get("company_impacts") or []
+    if company_impacts:
+        lines.append("## 自选股影响")
+        lines.append("")
+        for c in company_impacts:
+            companies = "、".join(x.get("name", "?") for x in c.get("companies", [])[:4]) or "—"
+            lines.append("- **%s**（%s）：%s" % (
+                companies, c.get("importance", ""),
+                (c.get("summary") or "").replace("\n", " ")[:140],
+            ))
         lines.append("")
     watch = (summary or {}).get("tomorrow_watch") or []
     if watch:

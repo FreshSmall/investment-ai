@@ -16,6 +16,7 @@ from jsonschema import Draft7Validator
 
 _SCHEMA_DIR = Path(__file__).resolve().parent
 _SECTOR_PLACEHOLDER = "__SECTORS__"
+_THESIS_PLACEHOLDER = "__THESES__"
 _FENCE_RE = re.compile(r"```(?:json)?\s*(.*?)\s*```", re.DOTALL)
 _TRAILING_COMMA_RE = re.compile(r",\s*([}\]])")
 
@@ -47,32 +48,41 @@ def parse_llm_json(text: Any) -> Dict[str, Any]:
     return data
 
 
-def load_schema(name: str, sector_keys: Optional[List[str]] = None) -> Dict[str, Any]:
+def load_schema(
+    name: str,
+    sector_keys: Optional[List[str]] = None,
+    thesis_ids: Optional[List[str]] = None,
+) -> Dict[str, Any]:
     path = _SCHEMA_DIR / ("%s.schema.json" % name)
     schema = json.loads(path.read_text(encoding="utf-8"))
-    if sector_keys:
-        schema = _inject_sectors(schema, sector_keys)
+    if sector_keys or thesis_ids:
+        schema = _inject_enums(schema, sector_keys or [], thesis_ids or [])
     return schema
 
 
-def _inject_sectors(node: Any, keys: List[str]) -> Any:
+def _inject_enums(node: Any, sector_keys: List[str], thesis_ids: List[str]) -> Any:
     if isinstance(node, dict):
         out = {}
         for k, v in node.items():
             if k == "enum" and isinstance(v, list) and _SECTOR_PLACEHOLDER in v:
-                out[k] = keys
+                out[k] = sector_keys
+            elif k == "enum" and isinstance(v, list) and _THESIS_PLACEHOLDER in v:
+                out[k] = thesis_ids
             else:
-                out[k] = _inject_sectors(v, keys)
+                out[k] = _inject_enums(v, sector_keys, thesis_ids)
         return out
     if isinstance(node, list):
-        return [_inject_sectors(x, keys) for x in node]
+        return [_inject_enums(x, sector_keys, thesis_ids) for x in node]
     return node
 
 
 def validate(
-    schema_name: str, data: Dict[str, Any], sector_keys: Optional[List[str]] = None
+    schema_name: str,
+    data: Dict[str, Any],
+    sector_keys: Optional[List[str]] = None,
+    thesis_ids: Optional[List[str]] = None,
 ) -> Tuple[bool, List[str]]:
-    schema = load_schema(schema_name, sector_keys)
+    schema = load_schema(schema_name, sector_keys, thesis_ids)
     validator = Draft7Validator(schema)
     errors = sorted(validator.iter_errors(data), key=lambda e: list(e.absolute_path))
     if not errors:

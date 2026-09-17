@@ -49,6 +49,8 @@ _DAILY_SUMMARY = {
     "tomorrow_watch": ["关注龙头公司业绩指引", "跟踪板块资金流向"],
 }
 
+_THESIS_ID_RE = re.compile(r"## Thesis：.*?（([a-z0-9-]+)）")
+
 
 class MockLLMProvider(LLMProvider):
     name = "mock-llm"
@@ -122,4 +124,41 @@ class MockLLMProvider(LLMProvider):
             return payload
         if strategy == "daily_summary":
             return dict(_DAILY_SUMMARY)
+        if strategy == "thesis_review":
+            # 无相关事件 → neutral；有事件 → supporting（引用首个事件，weak）
+            tm = _THESIS_ID_RE.search(user_text)
+            thesis_id = tm.group(1) if tm else "unknown"
+            em = _EVENT_ID_RE.search(user_text)
+            if em is None:
+                return {
+                    "thesis_id": thesis_id, "direction": "neutral", "evidence": [],
+                    "falsification_triggered": {"triggered": False, "condition_id": None, "reason": "今日无相关事件"},
+                    "note": "mock 复盘：无相关事件，方向中性。",
+                    "next_questions": ["mock：下期跟踪指标是否有更新数据"],
+                }
+            eid = em.group(1)
+            return {
+                "thesis_id": thesis_id, "direction": "supporting",
+                "evidence": [
+                    {"text": "mock 支持证据：产业链需求信号积极。", "source_event_id": eid,
+                     "direction": "supporting", "weight": "strong"},
+                ],
+                "falsification_triggered": {"triggered": False, "condition_id": None, "reason": "无证伪信号"},
+                "note": "mock 复盘：今日事件与假设方向一致。",
+                "next_questions": ["mock：验证下季度数据是否延续"],
+            }
+        if strategy == "company_impact":
+            m = _EVENT_ID_RE.search(user_text)
+            eid = m.group(1) if m else "0000000000000000"
+            payload = dict(_EVENT_ANALYSIS_TEMPLATE)
+            payload["summary"] = "mock 公司影响：事件对命中公司构成订单端正面传导。"
+            payload["affected_companies"] = [{"name": "中际旭创", "code": "300308", "channel": "AI CAPEX 订单弹性"}]
+            payload["facts"] = [dict(f, source_event_id=eid) for f in _EVENT_ANALYSIS_TEMPLATE["facts"]]
+            payload["supporting_evidence"] = [
+                dict(f, source_event_id=eid) for f in _EVENT_ANALYSIS_TEMPLATE["supporting_evidence"]
+            ]
+            payload["counter_evidence"] = [
+                dict(f, source_event_id=eid) for f in _EVENT_ANALYSIS_TEMPLATE["counter_evidence"]
+            ]
+            return payload
         return {"ok": True, "strategy": strategy}

@@ -181,3 +181,62 @@ def test_sector_injection_replaces_placeholder() -> None:
     schema = load_schema("classification_v1", ["foo_sector"])
     text = json.dumps(schema)
     assert "__SECTORS__" not in text and "foo_sector" in text
+
+
+# ---------------- thesis_review_v1 (V0.2) ----------------
+
+THESES = ["ai-demand-growth", "power-infrastructure"]
+
+
+def valid_thesis_review() -> dict:
+    return {
+        "thesis_id": "ai-demand-growth",
+        "direction": "supporting",
+        "evidence": [
+            {"text": "云厂商上调资本开支指引。", "source_event_id": EID,
+             "direction": "supporting", "weight": "strong"},
+        ],
+        "falsification_triggered": {"triggered": False, "condition_id": None, "reason": "无证伪信号"},
+        "note": "今日信息与假设方向一致，需求侧信号积极。",
+        "next_questions": ["跟踪下季度 CAPEX 指引"],
+    }
+
+
+def test_thesis_review_valid() -> None:
+    ok, errors = validate("thesis_review_v1", valid_thesis_review(), SECTORS, THESES)
+    assert ok, errors
+
+
+def test_thesis_review_hallucinated_thesis_id_rejected() -> None:
+    payload = valid_thesis_review()
+    payload["thesis_id"] = "made-up-thesis"
+    ok, _ = validate("thesis_review_v1", payload, SECTORS, THESES)
+    assert not ok  # 枚举外 thesis id = 幻觉，打回
+
+
+def test_thesis_review_bad_direction_rejected() -> None:
+    payload = valid_thesis_review()
+    payload["direction"] = "buy"  # 评分/买卖类输出在 schema 层即拒绝
+    ok, _ = validate("thesis_review_v1", payload, SECTORS, THESES)
+    assert not ok
+
+
+def test_thesis_review_empty_evidence_ok_on_quiet_day() -> None:
+    payload = valid_thesis_review()
+    payload["direction"] = "neutral"
+    payload["evidence"] = []
+    ok, _ = validate("thesis_review_v1", payload, SECTORS, THESES)
+    assert ok
+
+
+def test_thesis_review_missing_falsification_block_rejected() -> None:
+    payload = valid_thesis_review()
+    del payload["falsification_triggered"]
+    ok, _ = validate("thesis_review_v1", payload, SECTORS, THESES)
+    assert not ok
+
+
+def test_thesis_injection_replaces_placeholder() -> None:
+    schema = load_schema("thesis_review_v1", None, ["my-thesis"])
+    text = json.dumps(schema)
+    assert "__THESES__" not in text and "my-thesis" in text

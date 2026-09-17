@@ -1,4 +1,8 @@
-"""Idempotency Test（指令十五）：`daily` 连跑两次 + force 重跑，四级零重复断言。"""
+"""Idempotency Test（指令十五）：`daily` 连跑两次 + force 重跑，多级零重复断言。
+
+使用 main._steps() 生产步骤序列（V0.2 起含 company_impact/thesis_review），
+并预置 theses+companies 种子，覆盖 Thesis 链路的幂等语义。
+"""
 
 from __future__ import annotations
 
@@ -15,6 +19,10 @@ from tests.conftest import _clean_tables, make_db_session, make_pipeline_ctx
 def idem_env(tmp_path):
     session = make_db_session()
     ctx = make_pipeline_ctx(session, tmp_path, frozen_time=datetime(2026, 9, 17, 20, 0))
+    from app.db.seed import seed_companies, seed_theses
+
+    seed_theses(session)
+    seed_companies(session)
     yield ctx
     ctx.restore_clock()
     _clean_tables(session)
@@ -22,21 +30,15 @@ def idem_env(tmp_path):
 
 
 def _run_pipeline(ctx, force: bool = False):
+    from main import _steps
     from app.pipeline.orchestrator import Orchestrator
-    from app.pipeline.steps.analyze import AnalyzeStep
-    from app.pipeline.steps.classify import ClassifyStep
-    from app.pipeline.steps.collect import CollectStep
-    from app.pipeline.steps.normalize import IngestStep
-    from app.pipeline.steps.report import ReportStep
 
     ctx.run_id = uuid.uuid4().hex
-    return Orchestrator([CollectStep(), IngestStep(), ClassifyStep(), AnalyzeStep(), ReportStep()]).run_daily(
-        ctx, force=force
-    )
+    return Orchestrator(_steps()).run_daily(ctx, force=force)
 
 
 def _db_counts(ctx):
-    from app.db.models import AnalysisRow, EventRow, ReportRow, RunRow
+    from app.db.models import AnalysisRow, EventRow, ReportRow, RunRow, ThesisEvidenceRow
 
     s = ctx.repo._s
     return {
@@ -44,6 +46,7 @@ def _db_counts(ctx):
         "analyses": s.query(AnalysisRow).count(),
         "reports": s.query(ReportRow).count(),
         "runs": s.query(RunRow).count(),
+        "evidence": s.query(ThesisEvidenceRow).count(),
     }
 
 
@@ -54,6 +57,7 @@ def test_daily_twice_full_idempotency(idem_env) -> None:
     counts1 = _db_counts(ctx)
     llm_calls1 = ctx.mock_llm.call_count()
     report1 = (ctx.vault_path / "Daily" / "2026-09-17.md").read_text(encoding="utf-8")
+    assert counts1["evidence"] >= 1  # thesis 链路确实跑过
 
     second = _run_pipeline(ctx)
     assert second.status.value == "skipped"
@@ -66,10 +70,12 @@ def test_daily_twice_full_idempotency(idem_env) -> None:
     assert third.stats["events_new"] == 0
     counts3 = _db_counts(ctx)
     assert counts3["events"] == counts1["events"]
-    assert counts3["analyses"] == counts1["analyses"]  # 含 daily_summary：refresh 为原地更新不加行
+    assert counts3["analyses"] == counts1["analyses"]  # thesis_review 与 daily_summary 同为 refresh 原地更新不加行
     assert counts3["reports"] == counts1["reports"]  # upsert 不重复
-    # 事件级分析零新调用（UNIQUE 缓存）；唯 daily_summary 按每日两次运行的 refresh 语义 +1
+    assert counts3["evidence"] == counts1["evidence"]  # 联合主键 upsert，证据零重复
+    # 事件级分析零新调用（UNIQUE 缓存）；唯 refresh 语义策略各 +1 次：daily_summary + 4×thesis_review
     assert ctx.mock_llm.call_count("daily_summary") == 2  # 首跑 1 + force 1
+    assert ctx.mock_llm.call_count("thesis_review") == 8  # 4 thesis × (首跑 + force)
     total_now = ctx.mock_llm.call_count()
-    assert total_now == llm_calls1 + 1  # 恰好多一次综述，事件分析零新增
+    assert total_now == llm_calls1 + 1 + 4  # 综述 +1、thesis 复盘 +4，其余（含 company_impact）零新增
     assert (ctx.vault_path / "Daily" / "2026-09-17.md").read_text(encoding="utf-8") == report1
