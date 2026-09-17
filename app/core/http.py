@@ -30,6 +30,7 @@ _TIER_SPEC: Dict[str, Tuple[float, float]] = {
     TIER_DEFAULT: (0.0, 0.0),
     TIER_CLS: (1.0, 0.3),
     TIER_EASTMONEY: (1.0, 0.4),
+    "cninfo": (1.0, 0.3),   # 巨潮公告（官方站点，礼貌串行）
 }
 
 _MAX_RETRIES = 3
@@ -68,11 +69,31 @@ class HttpClient:
         params: Optional[Dict[str, object]] = None,
         headers: Optional[Dict[str, str]] = None,
     ) -> httpx.Response:
+        return self._request("GET", url, params=params, headers=headers)
+
+    def post(
+        self,
+        url: str,
+        data: Optional[Dict[str, object]] = None,
+        json: Optional[Dict[str, object]] = None,
+        headers: Optional[Dict[str, str]] = None,
+    ) -> httpx.Response:
+        return self._request("POST", url, data=data, json=json, headers=headers)
+
+    def _request(
+        self,
+        method: str,
+        url: str,
+        params: Optional[Dict[str, object]] = None,
+        data: Optional[Dict[str, object]] = None,
+        json: Optional[Dict[str, object]] = None,
+        headers: Optional[Dict[str, str]] = None,
+    ) -> httpx.Response:
         last_error: Optional[str] = None
         for attempt in range(1, _MAX_RETRIES + 1):
             self._throttle()
             try:
-                resp = self._client.get(url, params=params, headers=headers)
+                resp = self._client.request(method, url, params=params, data=data, json=json, headers=headers)
             except httpx.TransportError as e:
                 last_error = "transport: %s" % e
                 if attempt == _MAX_RETRIES:

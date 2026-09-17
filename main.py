@@ -74,15 +74,19 @@ def _build_ctx(report_date: _date, providers_mode: str, settings: Settings):
         news_names = app_cfg.news_providers
     news_providers, degraded = build_news_providers(news_names)
 
-    # V0.3: 行情快照源（mock 模式联动 mock market）
+    # V0.3/V0.4: 行情快照 + 公告源（mock 模式联动）
     if providers_mode == "mock":
+        from app.providers.announcement.mock import MockAnnouncementProvider
         from app.providers.market.tencent import MockMarketProvider
 
         market_provider = MockMarketProvider()
+        announcement_provider = MockAnnouncementProvider()
     else:
+        from app.providers.announcement.cninfo import CninfoAnnouncementProvider
         from app.providers.market.tencent import TencentMarketProvider
 
         market_provider = TencentMarketProvider()
+        announcement_provider = CninfoAnnouncementProvider()
 
     ctx = StepContext(
         run_id=str(uuid.uuid4()),
@@ -96,6 +100,7 @@ def _build_ctx(report_date: _date, providers_mode: str, settings: Settings):
         degraded_sources=degraded,
         vault_path=effective_vault_path(app_cfg, settings),
         market_provider=market_provider,
+        announcement_provider=announcement_provider,
     )
     ctx.llm = llm  # type: ignore[attr-defined]
     return ctx
@@ -103,6 +108,7 @@ def _build_ctx(report_date: _date, providers_mode: str, settings: Settings):
 
 def _steps():
     from app.pipeline.steps.analyze import AnalyzeStep
+    from app.pipeline.steps.announcements import AnnouncementStep
     from app.pipeline.steps.classify import ClassifyStep
     from app.pipeline.steps.collect import CollectStep
     from app.pipeline.steps.company_impact import CompanyImpactStep
@@ -113,7 +119,7 @@ def _steps():
     from app.pipeline.steps.thesis_review import ThesisReviewStep
 
     return [
-        CollectStep(), IngestStep(), ClassifyStep(), AnalyzeStep(),
+        CollectStep(), AnnouncementStep(), IngestStep(), ClassifyStep(), AnalyzeStep(),
         MarketStep(), CompanyImpactStep(), ThesisReviewStep(),
         IndustryUpdateStep(), ReportStep(),
     ]

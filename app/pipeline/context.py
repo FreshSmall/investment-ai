@@ -28,3 +28,4 @@ class StepContext:
     vault_path: Path = Path("~/Investment-KB").expanduser()
     shared: Dict[str, Any] = field(default_factory=dict)  # step-to-step payload bus
     market_provider: Optional[MarketProvider] = None     # V0.3: None = market step degrades to skip
+    announcement_provider: Optional[Any] = None          # V0.4: NewsProvider-like (fetch_for_codes)

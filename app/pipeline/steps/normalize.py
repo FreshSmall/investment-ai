@@ -28,7 +28,9 @@ class IngestStep(Step):
             if not norm_title or not raw.published_at:
                 bad_records += 1
                 continue
-            if not l0_match(norm_title, norm_content, keywords, pipe.l0_min_content_hits):
+            # 官方公告（来源优先级最高，原始需求 §24）跳过关键词过滤，直接进分类
+            l0_bypass = bool((raw.raw or {}).get("l0_bypass"))
+            if not l0_bypass and not l0_match(norm_title, norm_content, keywords, pipe.l0_min_content_hits):
                 l0_filtered += 1
                 continue
             candidates.append(
