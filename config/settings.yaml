@@ -1,6 +1,6 @@
 # 运行配置：模型档位/预算/流水线参数/vault 路径。凭证一律走 .env，此处支持 ${VAR:default} 占位符。
 
-vault_path: ${IAI_VAULT_PATH:~/Investment-KB}
+vault_path: ${IAI_VAULT_PATH:/Users/bjhl/GitRepository/Investment-KB}
 
 news_providers: [cls, eastmoney]
 
