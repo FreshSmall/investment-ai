@@ -22,4 +22,4 @@ llm:
     deepseek-chat: {input_per_m: 4.0, output_per_m: 16.0}
     deepseek-v4-pro: {input_per_m: 8.0, output_per_m: 24.0}
   min_call_interval_seconds: 2  # LLM 串行调用最小间隔（防 RPM 限流）
-  daily_budget_cny: 10.0        # 当日 LLM 成本熔断线
+  daily_budget_cny: 5.0         # 当日 LLM 成本熔断线
