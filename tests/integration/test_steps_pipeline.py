@@ -123,18 +123,20 @@ def test_report_calm_day(pipeline_ctx) -> None:
     assert stats["report_events"] == 0
 
 
-def test_report_rerun_deterministic_and_cached(pipeline_ctx) -> None:
+def test_report_rerun_deterministic_and_refreshed(pipeline_ctx) -> None:
     ctx = pipeline_ctx
     run_collect_ingest(ctx)
     ClassifyStep().run(ctx)
     AnalyzeStep().run(ctx)
     ReportStep().run(ctx)
     first = (ctx.vault_path / "Daily" / "2026-09-17.md").read_text(encoding="utf-8")
-    calls_before = ctx.mock_llm.call_count("daily_summary")
+    summary_calls_before = ctx.mock_llm.call_count("daily_summary")
 
-    ReportStep().run(ctx)
+    ReportStep().run(ctx)  # 同日第二次运行（晚间语义）：综述 refresh，行不重复
     second = (ctx.vault_path / "Daily" / "2026-09-17.md").read_text(encoding="utf-8")
-    assert first == second  # 字节级一致（渲染确定性）
-    assert ctx.mock_llm.call_count("daily_summary") == calls_before  # aggregate 缓存命中
+    assert first == second  # mock 确定性 → 字节一致（真实 LLM 综述会更新为全天版，属预期）
+    assert ctx.mock_llm.call_count("daily_summary") == summary_calls_before + 1
     session = ctx.repo._s
     assert session.query(ReportRow).count() == 1  # upsert 不重复
+    from app.db.models import AnalysisRow
+    assert session.query(AnalysisRow).filter_by(strategy="daily_summary").count() == 1  # 原地更新不加行

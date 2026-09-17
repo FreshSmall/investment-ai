@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.conftest import make_db_session, make_pipeline_ctx
+from tests.conftest import _clean_tables, make_db_session, make_pipeline_ctx
 
 
 @pytest.fixture()
@@ -17,6 +17,7 @@ def idem_env(tmp_path):
     ctx = make_pipeline_ctx(session, tmp_path, frozen_time=datetime(2026, 9, 17, 20, 0))
     yield ctx
     ctx.restore_clock()
+    _clean_tables(session)
     session.close()
 
 
@@ -65,7 +66,10 @@ def test_daily_twice_full_idempotency(idem_env) -> None:
     assert third.stats["events_new"] == 0
     counts3 = _db_counts(ctx)
     assert counts3["events"] == counts1["events"]
-    assert counts3["analyses"] == counts1["analyses"]
-    assert counts3["reports"] == counts1["reports"]
-    assert ctx.mock_llm.call_count() == llm_calls1  # UNIQUE 缓存：force 也不重调 LLM
+    assert counts3["analyses"] == counts1["analyses"]  # 含 daily_summary：refresh 为原地更新不加行
+    assert counts3["reports"] == counts1["reports"]  # upsert 不重复
+    # 事件级分析零新调用（UNIQUE 缓存）；唯 daily_summary 按每日两次运行的 refresh 语义 +1
+    assert ctx.mock_llm.call_count("daily_summary") == 2  # 首跑 1 + force 1
+    total_now = ctx.mock_llm.call_count()
+    assert total_now == llm_calls1 + 1  # 恰好多一次综述，事件分析零新增
     assert (ctx.vault_path / "Daily" / "2026-09-17.md").read_text(encoding="utf-8") == report1

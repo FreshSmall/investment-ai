@@ -20,6 +20,6 @@ launchctl bootstrap "gui/$(id -u)" "$PLIST_DST"
 launchctl enable "gui/$(id -u)/$LABEL"
 
 echo "已安装: $LABEL"
-echo "下次触发: 每天 20:00（睡眠错过则唤醒后补跑）"
+echo "触发时间: 每天 09:00 与 22:00（--force 穿透当日 skip 门，靠 UNIQUE 缓存幂等）"
 echo "手动触发: launchctl kickstart gui/$(id -u)/$LABEL"
 echo "查看状态: launchctl list | grep investment-ai"

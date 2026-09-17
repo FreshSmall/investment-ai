@@ -151,8 +151,15 @@ class Repository:
         output_tokens: int = 0,
         cost_cny: float = 0.0,
         quality_flag: Optional[str] = None,
+        refresh: bool = False,
     ) -> Tuple[int, bool]:
-        """Returns (analysis_id, created). UNIQUE hit returns the existing row id."""
+        """Returns (analysis_id, created).
+
+        Default: UNIQUE hit returns the existing row (result cache). With
+        ``refresh=True`` (aggregate strategies on a twice-a-day schedule) the
+        existing row is updated in place — the day's summary must reflect the
+        full day, and rows never duplicate.
+        """
         stmt = select(AnalysisRow).where(
             AnalysisRow.strategy == strategy,
             AnalysisRow.prompt_version == prompt_version,
@@ -161,6 +168,13 @@ class Repository:
         )
         existing = self._s.scalars(stmt).first()
         if existing is not None:
+            if refresh:
+                existing.result_json = result
+                existing.model = model
+                existing.input_tokens = input_tokens
+                existing.output_tokens = output_tokens
+                existing.cost_cny = cost_cny
+                self._s.commit()
             return existing.id, False
         row = AnalysisRow(
             event_id=event_id,

@@ -63,11 +63,14 @@ class AnalysisEngine:
         except BudgetExceeded as e:
             return self._fail(strategy.name, ErrorKind.BUDGET_EXCEEDED, str(e))
 
-        # 2) result cache (idempotency): same event/aggregate + strategy already analyzed
+        # 2) result cache (idempotency): same event + strategy already analyzed.
+        # Aggregate strategies (daily_summary) are EXCLUDED: a day runs twice
+        # (09:00 / 22:00) and the summary must refresh to cover the full day —
+        # save_analysis upserts in place, so rows never duplicate.
         existing = None
         if event_id:
             existing = self._repo.get_analysis_for_event(event_id, strategy.name)
-        elif report_date:
+        elif report_date and strategy.scope != "aggregate":
             lookup = getattr(self._repo, "get_analysis_for_date", None)
             if lookup is not None:
                 existing = lookup(report_date, strategy.name)
@@ -129,6 +132,7 @@ class AnalysisEngine:
                 input_tokens=result.input_tokens,
                 output_tokens=result.output_tokens,
                 cost_cny=result.cost_cny,
+                refresh=(strategy.scope == "aggregate"),
             )
             self._budget.add(result.cost_cny)
             return AnalysisOutcome(

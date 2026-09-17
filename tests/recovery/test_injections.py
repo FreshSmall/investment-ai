@@ -7,7 +7,7 @@ from datetime import date, datetime
 
 import pytest
 
-from tests.conftest import make_db_session, make_pipeline_ctx
+from tests.conftest import _clean_tables, make_db_session, make_pipeline_ctx
 
 
 class BrokenProvider:
@@ -30,6 +30,7 @@ def rec_env(tmp_path):
     ctx = make_pipeline_ctx(session, tmp_path, frozen_time=datetime(2026, 9, 17, 20, 0))
     yield ctx
     ctx.restore_clock()
+    _clean_tables(session)
     session.close()
 
 

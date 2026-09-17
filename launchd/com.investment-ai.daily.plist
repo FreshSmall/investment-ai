@@ -10,19 +10,29 @@
         <string>/Users/bjhl/IdeaProjects/learn-project/investment-ai/.venv/bin/python</string>
         <string>/Users/bjhl/IdeaProjects/learn-project/investment-ai/main.py</string>
         <string>daily</string>
+        <string>--force</string>
     </array>
 
     <key>WorkingDirectory</key>
     <string>/Users/bjhl/IdeaProjects/learn-project/investment-ai</string>
 
-    <!-- 每天 20:00；Mac 睡眠错过时唤醒后补跑一次（daily 入口幂等防重复） -->
+    <!-- 每天 09:00 与 22:00 各一次；--force 穿透当日 skip 门（靠 UNIQUE 缓存保证不重复分析，
+         晚间运行将日报刷新为全天版）；Mac 睡眠错过时唤醒后补跑 -->
     <key>StartCalendarInterval</key>
-    <dict>
-        <key>Hour</key>
-        <integer>20</integer>
-        <key>Minute</key>
-        <integer>0</integer>
-    </dict>
+    <array>
+        <dict>
+            <key>Hour</key>
+            <integer>9</integer>
+            <key>Minute</key>
+            <integer>0</integer>
+        </dict>
+        <dict>
+            <key>Hour</key>
+            <integer>22</integer>
+            <key>Minute</key>
+            <integer>0</integer>
+        </dict>
+    </array>
 
     <key>RunAtLoad</key>
     <false/>
