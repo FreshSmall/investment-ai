@@ -58,13 +58,27 @@ class OpenAICompatLLMProvider(LLMProvider):
         price_lookup=None,
         transport: Optional[httpx.BaseTransport] = None,
         sleeper=None,
+        min_call_interval: float = 0.0,
     ) -> None:
         self._base = base_url.rstrip("/")
         self._api_key = api_key
         self._price_lookup = price_lookup or (lambda model: (0.0, 0.0))
         self._client = httpx.Client(transport=transport, timeout=60.0)
         self._sleep = sleeper if sleeper is not None else time.sleep
+        self._min_interval = min_call_interval
+        self._last_call = 0.0
         self._log = get_logger("llm")
+
+    def _throttle(self) -> None:
+        """GLM 免费档限流严格（短间隔连续调用 429），串行调用间保持最小间隔。"""
+        if self._min_interval <= 0:
+            return
+        import time as _t
+
+        wait = self._min_interval - (_t.monotonic() - self._last_call)
+        if wait > 0:
+            self._sleep(wait)
+        self._last_call = _t.monotonic()
 
     def complete_json(self, req: LLMRequest) -> LLMResult:
         body: dict = {
@@ -87,6 +101,7 @@ class OpenAICompatLLMProvider(LLMProvider):
         t0 = time.monotonic()
         last_error: Optional[str] = None
         for attempt in range(1, _MAX_ATTEMPTS + 1):
+            self._throttle()
             try:
                 resp = self._client.post(
                     self._base + "/chat/completions",
@@ -115,7 +130,14 @@ class OpenAICompatLLMProvider(LLMProvider):
                 )
 
             data = resp.json()
-            content = (((data.get("choices") or [{}])[0].get("message")) or {}).get("content", "")
+            choice = (data.get("choices") or [{}])[0]
+            msg = choice.get("message") or {}
+            content = msg.get("content") or ""
+            finish_reason = choice.get("finish_reason")
+            if not content.strip():
+                # GLM 思考模型：reasoning 可能耗尽 max_tokens 导致正文为空
+                hint = "（finish_reason=%s：若为 length，请上调该档位 max_tokens）" % finish_reason
+                return self._error_result(req, "模型正文为空 %s" % hint, t0)
             usage = data.get("usage") or {}
             input_tokens = int(usage.get("prompt_tokens", 0))
             output_tokens = int(usage.get("completion_tokens", 0))

@@ -69,6 +69,7 @@ def _build_ctx(report_date: _date, providers_mode: str, settings: Settings):
                 app_cfg.llm.price_of(m).input_per_m,
                 app_cfg.llm.price_of(m).output_per_m,
             ),
+            min_call_interval=app_cfg.llm.min_call_interval_seconds,
         )
         news_names = app_cfg.news_providers
     news_providers, degraded = build_news_providers(news_names)

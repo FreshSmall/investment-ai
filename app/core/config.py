@@ -78,6 +78,7 @@ class LlmCfg(BaseModel):
     tiers: Dict[str, ModelTierCfg]
     prices: Dict[str, PriceCfg] = Field(default_factory=dict)
     daily_budget_cny: float = 10.0
+    min_call_interval_seconds: float = 0.0
 
     def price_of(self, model: str) -> PriceCfg:
         return self.prices.get(model, PriceCfg())
