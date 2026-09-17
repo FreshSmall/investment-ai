@@ -80,6 +80,18 @@ def build_daily_model(repo: Repository, report_date: date, summary: Optional[Dic
     if review_row is not None:
         market["review"] = review_row.result_json or {}
 
+    # V0.5: devil's advocate board（当日获得支持证据的 thesis 的反方视角）
+    devil_notes: List[Dict] = []
+    thesis_titles_da = thesis_titles
+    for row in repo.analyses_for_date(report_date, "devil_advocate"):
+        result = row.result_json or {}
+        devil_notes.append({
+            "thesis_id": row.thesis_id,
+            "title": thesis_titles_da.get(row.thesis_id, row.thesis_id),
+            "counter_points": result.get("counter_points") or [],
+            "overall_note": result.get("overall_note", ""),
+        })
+
     return {
         "report_date": str(report_date),
         "summary": summary or {},
@@ -89,6 +101,7 @@ def build_daily_model(repo: Repository, report_date: date, summary: Optional[Dic
         "thesis_updates": thesis_updates,
         "company_impacts": company_impacts,
         "market": market,
+        "devil_notes": devil_notes,
     }
 
 
@@ -111,8 +124,13 @@ def write_daily_report(
             t["new_status"] = changes[t["thesis_id"]]
     ensure_skeletons(vault, sectors_cfg, theses)
 
-    # V0.2: Thesis 长文件以 DB 为准重渲染（evidence/changes 滚动窗口）
+    # V0.2: Thesis 长文件以 DB 为准重渲染（evidence/changes 滚动窗口）；
+    # V0.5: devil_advocate 反证从 analyses 合并进渲染（weight 上限 weak，不进 thesis_evidence）
     from app.knowledge.renderer import write_thesis_file
+
+    devil_by_thesis: dict = {}
+    for row in repo.analyses_for_date(report_date, "devil_advocate"):
+        devil_by_thesis[row.thesis_id] = row.result_json or {}
 
     for t in theses:
         evidence = [
@@ -122,7 +140,13 @@ def write_daily_report(
             }
             for e in repo.list_thesis_evidence(t["id"], limit=20)
         ]
-        write_thesis_file(vault, t, evidence)
+        devil = devil_by_thesis.get(t["id"]) or {}
+        for cp in devil.get("counter_points") or []:
+            evidence.insert(0, {
+                "review_date": str(report_date), "direction": "contradicting",
+                "weight": "weak", "note": cp.get("text", ""), "event_id": cp.get("source_event_id", ""),
+            })
+        write_thesis_file(vault, t, evidence[:25])
 
     md = render_daily_md(model)
     path = vault / "Daily" / ("%s.md" % report_date)

@@ -296,6 +296,16 @@ def render_daily_md(model: Dict) -> str:
         if review.get("risk_flags"):
             lines.append("**风险信号**：%s" % "；".join(review["risk_flags"]))
             lines.append("")
+    # V0.5: devil's advocate board（反方视角，与 Thesis 复盘对置）
+    devil_notes = model.get("devil_notes") or []
+    if devil_notes:
+        lines.append("## 🔱 反方视角（Devil's Advocate）")
+        lines.append("")
+        for d in devil_notes:
+            lines.append("- **%s**：%s" % (d.get("title", "?"), (d.get("overall_note") or "").replace("\n", " ")[:140]))
+            for cp in (d.get("counter_points") or [])[:2]:
+                lines.append("  - %s" % (cp.get("text", "")[:120]))
+        lines.append("")
     # V0.2: thesis review board
     thesis_updates = model.get("thesis_updates") or []
     if thesis_updates:

@@ -60,4 +60,21 @@ STRATEGIES = {
         prompt_file="industry_update_v1.md",
         scope="thesis",  # refresh-in-place semantics, dimension key = sector
     ),
+    # V0.5: devil's advocate — counter-evidence candidates for today's
+    # supporting theses (output weight capped at weak by code, arch §7.4)
+    "devil_advocate": Strategy(
+        name="devil_advocate",
+        tier=StrategyTier.L2,
+        schema_name="devil_advocate_v1",
+        prompt_file="devil_advocate_v1.md",
+        scope="thesis",
+    ),
+    # V0.5: weekly review (L3 flagship, Sunday)
+    "weekly_review": Strategy(
+        name="weekly_review",
+        tier=StrategyTier.L3,
+        schema_name="weekly_review_v1",
+        prompt_file="weekly_review_v1.md",
+        scope="aggregate",
+    ),
 }

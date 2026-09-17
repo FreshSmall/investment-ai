@@ -1,0 +1,39 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "weekly_review_v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["week_summary", "industry_changes", "thesis_changes", "validated", "falsified", "next_week_watch"],
+  "properties": {
+    "week_summary": {"type": "string", "minLength": 10, "maxLength": 600},
+    "industry_changes": {
+      "type": "array",
+      "maxItems": 6,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["sector", "change"],
+        "properties": {
+          "sector": {"type": "string", "enum": ["__SECTORS__"]},
+          "change": {"type": "string", "minLength": 4, "maxLength": 200}
+        }
+      }
+    },
+    "thesis_changes": {
+      "type": "array",
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["thesis_id", "change"],
+        "properties": {
+          "thesis_id": {"type": "string", "enum": ["__THESES__"]},
+          "change": {"type": "string", "minLength": 4, "maxLength": 200}
+        }
+      }
+    },
+    "validated": {"type": "array", "maxItems": 6, "items": {"type": "string", "minLength": 4, "maxLength": 200}},
+    "falsified": {"type": "array", "maxItems": 6, "items": {"type": "string", "minLength": 4, "maxLength": 200}},
+    "next_week_watch": {"type": "array", "minItems": 1, "maxItems": 5, "items": {"type": "string", "minLength": 4, "maxLength": 150}}
+  }
+}

@@ -1,25 +1,29 @@
 #!/bin/bash
-# 安装/更新 investment-ai 的 launchd 调度（TASK-024）
+# 安装/更新 investment-ai 的 launchd 调度（TASK-024 + V0.5 weekly）
 set -euo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-PLIST_SRC="$PROJECT_DIR/launchd/com.investment-ai.daily.plist"
-PLIST_DST="$HOME/Library/LaunchAgents/com.investment-ai.daily.plist"
-LABEL="com.investment-ai.daily"
-
 mkdir -p "$HOME/Library/LaunchAgents" "$PROJECT_DIR/logs"
 
-# 先卸载旧版本（不存在时忽略）
-launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
-launchctl unload "$PLIST_DST" 2>/dev/null || true
+install_one() {
+    local name="$1"
+    local src="$PROJECT_DIR/launchd/com.investment-ai.${name}.plist"
+    local dst="$HOME/Library/LaunchAgents/com.investment-ai.${name}.plist"
+    local label="com.investment-ai.${name}"
 
-cp "$PLIST_SRC" "$PLIST_DST"
-# 若项目路径变化，这里可加 sed 替换绝对路径（当前按本机路径生成）
+    launchctl bootout "gui/$(id -u)/$label" 2>/dev/null || true
+    launchctl unload "$dst" 2>/dev/null || true
 
-launchctl bootstrap "gui/$(id -u)" "$PLIST_DST"
-launchctl enable "gui/$(id -u)/$LABEL"
+    cp "$src" "$dst"
+    launchctl bootstrap "gui/$(id -u)" "$dst"
+    launchctl enable "gui/$(id -u)/$label"
+    echo "已安装: $label"
+}
 
-echo "已安装: $LABEL"
-echo "触发时间: 每天 09:00 与 22:00（--force 穿透当日 skip 门，靠 UNIQUE 缓存幂等）"
-echo "手动触发: launchctl kickstart gui/$(id -u)/$LABEL"
+install_one daily
+install_one weekly
+
+echo "daily : 每天 09:00 与 22:00（--force 穿透 skip 门，靠 UNIQUE 缓存幂等）"
+echo "weekly: 每周日 21:30（本周已生成则幂等跳过 L3 调用）"
+echo "手动触发: launchctl kickstart gui/$(id -u)/com.investment-ai.daily"
 echo "查看状态: launchctl list | grep investment-ai"

@@ -277,3 +277,38 @@ def test_industry_update_valid_and_bad_section() -> None:
     payload["sections"][0]["name"] = "changelog"  # LLM 不允许动 changelog 节
     ok2, _ = validate("industry_update_v1", payload, SECTORS)
     assert not ok2
+
+
+# ---------------- devil_advocate_v1 / weekly_review_v1 (V0.5) ----------------
+
+
+def test_devil_advocate_valid() -> None:
+    ok, errors = validate("devil_advocate_v1", {
+        "thesis_id": "ai-demand-growth",
+        "counter_points": [{"text": "【风险】扩产压缩毛利率。", "source_event_id": EID}],
+        "logic_gaps": ["订单到需求的传导未验证。"],
+        "alternative_explanations": ["或为下游备库存。"],
+        "overall_note": "支持证据兼容备货解读。",
+    }, SECTORS, THESES)
+    assert ok, errors
+
+
+def test_devil_advocate_hallucinated_thesis_rejected() -> None:
+    payload = {
+        "thesis_id": "no-such-thesis", "counter_points": [], "logic_gaps": [], 
+        "alternative_explanations": [], "overall_note": "x" * 10,
+    }
+    ok, _ = validate("devil_advocate_v1", payload, SECTORS, THESES)
+    assert not ok
+
+
+def test_weekly_review_valid() -> None:
+    ok, errors = validate("weekly_review_v1", {
+        "week_summary": "本周三大行业主线延续，AI 算力链催化密集。",
+        "industry_changes": [{"sector": "ai_semiconductor", "change": "订单信号持续正面"}],
+        "thesis_changes": [{"thesis_id": "ai-demand-growth", "change": "周内证据持续支持"}],
+        "validated": ["算力需求传导至光模块订单"],
+        "falsified": [],
+        "next_week_watch": ["云厂商季报 CAPEX 指引"],
+    }, SECTORS, THESES)
+    assert ok, errors

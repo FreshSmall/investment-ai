@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.investment-ai.weekly</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/bjhl/IdeaProjects/learn-project/investment-ai/.venv/bin/python</string>
+        <string>/Users/bjhl/IdeaProjects/learn-project/investment-ai/main.py</string>
+        <string>weekly</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/bjhl/IdeaProjects/learn-project/investment-ai</string>
+
+    <!-- 每周日 21:30；generate_weekly 幂等（本周已生成则跳过 L3 调用）；
+         Mac 睡眠错过时唤醒后补跑 -->
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Weekday</key>
+        <integer>0</integer>
+        <key>Hour</key>
+        <integer>21</integer>
+        <key>Minute</key>
+        <integer>30</integer>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <false/>
+
+    <key>StandardOutPath</key>
+    <string>/Users/bjhl/IdeaProjects/learn-project/investment-ai/logs/weekly-launchd.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/bjhl/IdeaProjects/learn-project/investment-ai/logs/weekly-launchd.log</string>
+
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <true/>
+    </dict>
+    <key>ThrottleInterval</key>
+    <integer>60</integer>
+</dict>
+</plist>

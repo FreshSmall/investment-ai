@@ -191,4 +191,26 @@ class MockLLMProvider(LLMProvider):
                     [{"change": "催化剂：下游订单信号增强", "evidence_event_id": evs[0]}] if evs else []
                 ),
             }
+        if strategy == "devil_advocate":
+            tm = _THESIS_ID_RE.search(user_text)
+            em = _EVENT_ID_RE.search(user_text)
+            return {
+                "thesis_id": tm.group(1) if tm else "unknown",
+                "counter_points": (
+                    [{"text": "【风险】扩产潮可能压缩远端毛利率。", "source_event_id": em.group(1)}]
+                    if em else []
+                ),
+                "logic_gaps": ["订单增长与真实需求的传导未验证。"],
+                "alternative_explanations": ["订单或为下游安全库存备货。"],
+                "overall_note": "mock 反方小结：支持证据兼容备货解读，需验证终端需求数据。",
+            }
+        if strategy == "weekly_review":
+            return {
+                "week_summary": "mock 周度综述：三大行业主线延续，AI 算力链催化密集。",
+                "industry_changes": [{"sector": "ai_semiconductor", "change": "订单与产能信号持续正面"}],
+                "thesis_changes": [{"thesis_id": "ai-demand-growth", "change": "周内证据持续支持"}],
+                "validated": ["算力需求传导至光模块订单"],
+                "falsified": [],
+                "next_week_watch": ["云厂商季报 CAPEX 指引", "机器人量产定点进展"],
+            }
         return {"ok": True, "strategy": strategy}

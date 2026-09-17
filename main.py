@@ -112,6 +112,7 @@ def _steps():
     from app.pipeline.steps.classify import ClassifyStep
     from app.pipeline.steps.collect import CollectStep
     from app.pipeline.steps.company_impact import CompanyImpactStep
+    from app.pipeline.steps.devil_advocate import DevilAdvocateStep
     from app.pipeline.steps.industry_update import IndustryUpdateStep
     from app.pipeline.steps.market import MarketStep
     from app.pipeline.steps.normalize import IngestStep
@@ -120,7 +121,7 @@ def _steps():
 
     return [
         CollectStep(), AnnouncementStep(), IngestStep(), ClassifyStep(), AnalyzeStep(),
-        MarketStep(), CompanyImpactStep(), ThesisReviewStep(),
+        MarketStep(), CompanyImpactStep(), ThesisReviewStep(), DevilAdvocateStep(),
         IndustryUpdateStep(), ReportStep(),
     ]
 
@@ -259,6 +260,21 @@ def cmd_backfill(args) -> int:
     return rc
 
 
+def cmd_weekly(args) -> int:
+    from app.report.weekly import generate_weekly
+
+    settings = get_settings()
+    report_date = _date.fromisoformat(args.date) if args.date else clock.today()
+    ctx = _build_ctx(report_date, args.providers, settings)
+    setup_logging(run_id=ctx.run_id)
+    path = generate_weekly(ctx.engine, ctx.repo, ctx.vault_path, report_date, force=args.force)
+    if path is None:
+        print("weekly review 失败（详见日志）")
+        return 3
+    print("weekly written: %s" % path)
+    return 0
+
+
 def main(argv: List[str] = None) -> int:
     parser = argparse.ArgumentParser(prog="investment-ai")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -291,6 +307,12 @@ def main(argv: List[str] = None) -> int:
     p_backfill.add_argument("--until", required=True)
     p_backfill.add_argument("--providers", choices=["real", "mock"], default="real")
     p_backfill.set_defaults(func=cmd_backfill)
+
+    p_weekly = sub.add_parser("weekly", help="周度复盘（V0.5，默认本周）")
+    p_weekly.add_argument("--date", help="锚定日期 YYYY-MM-DD（默认今天）")
+    p_weekly.add_argument("--force", action="store_true", help="重新生成本周（L3 调用）")
+    p_weekly.add_argument("--providers", choices=["real", "mock"], default="real")
+    p_weekly.set_defaults(func=cmd_weekly)
 
     args = parser.parse_args(argv)
     return args.func(args)
