@@ -194,6 +194,10 @@ def render_daily_md(model: Dict) -> str:
             lines.append("")
             lines.append(_source_footer(ev))
             lines.append("")
+    p1_hidden = model.get("p1_hidden") or 0
+    if events and p1_hidden:
+        lines.append("*注：另有 %d 条 P1 事件未展开（超出日报 P1 展示上限，按时间保留最近条目）。*" % p1_hidden)
+        lines.append("")
     if not events:
         lines.append("## 平静日")
         lines.append("")

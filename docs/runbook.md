@@ -9,9 +9,11 @@
 ```text
 每天 09:00 / 22:00（launchd）
   → 采集财联社+东财快讯（26h 回看窗口）
-  → L0 关键词过滤 → 去重入库（MySQL: investment_ai）
+  → L0 关键词过滤（正文-only 需 ≥2 个不同行业关键词）
+    → 同题归并（标题 bigram Jaccard≥0.6 且最长公共子串≥10 字，近 48h 窗口+批内，最早发布者胜出）
+    → 去重入库（MySQL: investment_ai）
   → L1 分类分级（deepseek-flash）→ P0/P1 深度分析（deepseek-chat）
-  → 日报写入 vault → 晚间运行将日报刷新为全天版
+  → 日报写入 vault（P0 全量 + 最近 N 条 P1，N=pipeline.daily_p1_cap，超出在尾部提示）→ 晚间运行将日报刷新为全天版
 ```
 
 | 资产 | 位置 |

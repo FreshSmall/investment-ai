@@ -24,7 +24,8 @@ def test_collect_and_ingest_full_flow(pipeline_ctx) -> None:
     stats = run_collect_ingest(ctx)
     assert stats["events_fetched"] == 11        # 12 fixtures - 1 坏时间戳
     assert stats["events_l0_filtered"] == 1     # 饮料新闻
-    assert stats["events_deduplicated"] == 1    # 跨源同文（eastmoney/2001 vs cls/1001）
+    assert stats["events_near_dup"] == 1        # 跨源同题（eastmoney/2001 vs cls/1001，ingest 阶段拦截）
+    assert stats["events_deduplicated"] == 0    # 同题已被 near-dup 前置消化
     assert stats["events_new"] == 9
     rows = ctx.repo.get_events_for_classify()
     assert len(rows) == 9
@@ -35,7 +36,8 @@ def test_ingest_rerun_zero_new(pipeline_ctx) -> None:
     run_collect_ingest(ctx)
     second = IngestStep().run(ctx)  # 同一批 raw_events 再次入库
     assert second.stats["events_new"] == 0
-    assert second.stats["events_deduplicated"] == 10  # 9 条 (source,source_id) + 1 条跨源同文 hash
+    assert second.stats["events_near_dup"] == 10  # 10 条候选全部与库内标题同题
+    assert second.stats["events_deduplicated"] == 0
 
 
 def test_classify_step_assigns_importance(pipeline_ctx) -> None:

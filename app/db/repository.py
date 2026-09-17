@@ -14,6 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.dialects.mysql import insert as mysql_insert
 from sqlalchemy.orm import Session
 
+from app.core import clock
 from app.core.log import get_logger
 from app.db.models import (
     AnalysisRow,
@@ -75,6 +76,14 @@ class Repository:
                 stats.inserted += 1
         self._s.commit()
         return stats
+
+    def recent_event_titles(self, hours: int) -> List[str]:
+        """Titles of events published in the last N hours — near-dup comparison input."""
+        cutoff = clock.now() - timedelta(hours=hours)
+        stmt = select(EventRow.title).where(
+            EventRow.published_at >= cutoff, EventRow.title.is_not(None)
+        )
+        return [t for t in self._s.scalars(stmt) if t]
 
     def get_events_for_classify(self, limit: Optional[int] = None) -> List[EventRow]:
         stmt = select(EventRow).where(

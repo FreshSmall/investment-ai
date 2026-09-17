@@ -72,6 +72,11 @@ class PipelineCfg(BaseModel):
     classify_batch_size: int = 20
     watchdog_minutes: int = 30
     llm_timeout_seconds: int = 60
+    daily_p1_cap: int = 30            # 日报渲染 P1 条数上限（P0 不设限）
+    l0_min_content_hits: int = 2      # 正文-only 命中需 ≥N 个不同行业关键词
+    near_dup_hours: int = 48          # 同题归并回看窗口
+    near_dup_jaccard: float = 0.6     # 标题 bigram Jaccard 阈值
+    near_dup_lcs_chars: int = 10      # 最长公共子串阈值（防定期栏目误合并）
 
 
 class LlmCfg(BaseModel):

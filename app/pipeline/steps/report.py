@@ -15,8 +15,9 @@ class ReportStep(Step):
     def run(self, ctx: StepContext) -> StepResult:
         log = get_logger("step.report")
 
-        # 1) LLM 日度综述（预算不足或失败时报告照出，summary 置空）
-        preview = build_daily_model(ctx.repo, ctx.report_date, summary=None)
+        # 1) LLM 日度综述（预算不足或失败时报告照出，summary 置空）；
+        #    preview 与正文用同一份 P1 截断集，综述不引用未展开事件
+        preview = build_daily_model(ctx.repo, ctx.report_date, summary=None, p1_cap=ctx.app_cfg.pipeline.daily_p1_cap)
         summary_outcome = ctx.engine.run(
             "daily_summary",
             prompt_ctx={
@@ -47,7 +48,10 @@ class ReportStep(Step):
         ]
 
         try:
-            path = write_daily_report(ctx.repo, ctx.report_date, summary, ctx.vault_path, theses, ctx.sectors)
+            path = write_daily_report(
+                ctx.repo, ctx.report_date, summary, ctx.vault_path, theses, ctx.sectors,
+                p1_cap=ctx.app_cfg.pipeline.daily_p1_cap,
+            )
         except OSError as e:
             log.error("vault 写入失败（DB 不回滚，render --all 可重建）", extra={"ctx": {"error": str(e)[:200]}})
             return StepResult(

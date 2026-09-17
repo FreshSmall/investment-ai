@@ -82,11 +82,67 @@ def normalize_text(text: str) -> str:
     return text.strip()
 
 
-def l0_match(title: str, content: str, keywords: List[str]) -> bool:
-    """Cheap relevance filter: title hit outweighs content hit (title-only is enough)."""
+def l0_match(title: str, content: str, keywords: List[str], min_content_hits: int = 2) -> bool:
+    """Cheap relevance filter: title hit outweighs content hit (title-only is enough).
+
+    Content-only matches must contain ``min_content_hits`` distinct keywords —
+    single generic-word mentions (AI/芯片/机器人 in market chatter) are noise.
+    """
     norm_kw = [normalize_text(k).lower() for k in keywords if k]
     title_l = normalize_text(title).lower()
     if any(k in title_l for k in norm_kw):
         return True
     content_l = normalize_text(content).lower()
-    return any(k in content_l for k in norm_kw)
+    return sum(1 for k in set(norm_kw) if k in content_l) >= min_content_hits
+
+
+# ---------------- near-duplicate titles (same-story merge) ----------------
+
+
+def _title_bigrams(title: str) -> set:
+    folded = "".join(normalize_text(title).lower().split())
+    return {folded[i:i + 2] for i in range(len(folded) - 1)}
+
+
+def title_jaccard(a: str, b: str) -> float:
+    """Char-bigram Jaccard on normalized titles; 0.0 on empty input."""
+    A, B = _title_bigrams(a), _title_bigrams(b)
+    if not A or not B:
+        return 0.0
+    return len(A & B) / len(A | B)
+
+
+def lcs_len(a: str, b: str) -> int:
+    """Longest common substring length (run of identical chars)."""
+    best = 0
+    prev = [0] * (len(b) + 1)
+    for i in range(1, len(a) + 1):
+        cur = [0] * (len(b) + 1)
+        ai = a[i - 1]
+        for j in range(1, len(b) + 1):
+            if ai == b[j - 1]:
+                cur[j] = prev[j - 1] + 1
+                if cur[j] > best:
+                    best = cur[j]
+        prev = cur
+    return best
+
+
+def _fold(title: str) -> str:
+    return "".join(normalize_text(title).lower().split())
+
+
+def is_near_dup_title(a: str, b: str, jaccard_min: float = 0.6, lcs_min: int = 10) -> bool:
+    """Same-story test for flash headlines.
+
+    Two conditions keep periodic digests apart ("早间/晚间新闻精选" share J≈0.73
+    but no long common run; "9月16/17日涨停分析" likewise), while cross-source
+    reprints and "财联社X日电，" prefix variants merge.
+    """
+    fa, fb = _fold(a), _fold(b)
+    if not fa or not fb:
+        return False
+    A, B = _title_bigrams(a), _title_bigrams(b)
+    if len(A & B) / len(A | B) < jaccard_min:
+        return False
+    return lcs_len(fa, fb) >= lcs_min

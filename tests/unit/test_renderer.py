@@ -80,6 +80,25 @@ def test_daily_render_calm_day() -> None:
     assert "平静日" in md and "无 P0/P1" in md
 
 
+def test_daily_render_p1_truncation_note() -> None:
+    model = {
+        "report_date": "2026-09-17",
+        "summary": {},
+        "events": [
+            {"event_id": "a" * 16, "title": "P1事件一", "importance": "P1", "sectors": [],
+             "event_type": "catalyst", "published_at": "2026-09-17 10:00",
+             "source_name": "cls", "source_url": None, "analysis": None},
+        ],
+        "metrics": {},
+        "p1_hidden": 53,
+    }
+    md = render_daily_md(model)
+    assert "另有 53 条 P1 事件未展开" in md
+    # 无截断时不出现提示
+    md2 = render_daily_md({**model, "p1_hidden": 0})
+    assert "未展开" not in md2
+
+
 def test_skeleton_three_lifecycle(tmp_path: Path) -> None:
     theses = [{"id": "ai-demand-growth", "title": "AI 需求增长", "core_hypothesis": "假设正文",
                "falsification_conditions": [{"id": "c1", "condition": "条件", "metric": "指标"}],
