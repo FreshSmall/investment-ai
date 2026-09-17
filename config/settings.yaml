@@ -11,14 +11,15 @@ pipeline:
   llm_timeout_seconds: 60
 
 llm:
-  # 全 GLM（智谱 BigModel，OpenAI 兼容端点：open.bigmodel.cn/api/paas/v4 + .env 的 LLM_API_KEY）
-  # 三档分层（架构 §7）：L1 免费档分类 / L2 标准档分析 / L3 旗舰档复盘（V0.5 起）
+  # 全 DeepSeek（api.deepseek.com/v1 + .env 的 LLM_API_KEY）
+  # 三档分层（架构 §7）：L1 便宜档分类 / L2 标准档分析 / L3 旗舰档复盘（V0.5 起）
   tiers:
-    L1: {model: glm-4.7-flash, temperature: 0.1, max_tokens: 3000}
-    L2: {model: glm-5.3, temperature: 0.3, max_tokens: 5000}
-    L3: {model: glm-5.3, temperature: 0.3, max_tokens: 6000}
-  prices:                     # ¥/百万 token（以 bigmodel.cn/pricing 为准，此处估值用于熔断）
-    glm-4.7-flash: {input_per_m: 0.0, output_per_m: 0.0}
-    glm-5.3: {input_per_m: 8.0, output_per_m: 24.0}   # 估值，以 bigmodel.cn/pricing 为准
-  min_call_interval_seconds: 5  # LLM 串行调用最小间隔（GLM 免费档限流严格，防 429）
-  daily_budget_cny: 10.0        # 当日 LLM 成本熔断线（flash 免费后主要约束 L2）
+    L1: {model: deepseek-flash, temperature: 0.1, max_tokens: 2000}
+    L2: {model: deepseek-chat, temperature: 0.3, max_tokens: 2500}
+    L3: {model: deepseek-v4-pro, temperature: 0.3, max_tokens: 4000}
+  prices:                     # ¥/百万 token（以 DeepSeek 官方定价页为准）
+    deepseek-flash: {input_per_m: 1.0, output_per_m: 2.0}
+    deepseek-chat: {input_per_m: 4.0, output_per_m: 16.0}
+    deepseek-v4-pro: {input_per_m: 8.0, output_per_m: 24.0}
+  min_call_interval_seconds: 2  # LLM 串行调用最小间隔（防 RPM 限流）
+  daily_budget_cny: 10.0        # 当日 LLM 成本熔断线

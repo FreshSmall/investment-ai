@@ -39,7 +39,7 @@ def test_load_app_config_real_file() -> None:
     cfg = load_app_config()
     assert isinstance(cfg, AppCfg)
     assert cfg.pipeline.lookback_hours == 26
-    assert cfg.llm.tiers["L1"].model == "glm-4.7-flash"  # GLM 免费档
+    assert cfg.llm.tiers["L1"].model == "deepseek-flash"
     assert cfg.llm.daily_budget_cny > 0
     assert "cls" in cfg.news_providers
 
