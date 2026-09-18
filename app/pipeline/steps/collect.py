@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from app.core import clock
 from app.core.config import PROJECT_ROOT
@@ -18,7 +18,15 @@ class CollectStep(Step):
 
     def run(self, ctx: StepContext) -> StepResult:
         log = get_logger("step.collect")
-        since = clock.now() - timedelta(hours=ctx.app_cfg.pipeline.lookback_hours)
+        # 抓取窗口锚定 report_date：backfill 历史日期时窗口随日期走（而非 wall clock，
+        # 否则只能抓到"今天"的新闻）；当日运行时窗口上限即当前时刻，行为不变。
+        # subprocess 级 e2e 无法 monkeypatch clock，mock fixture 冻结在固定日期，
+        # 窗口必须由 --date 决定才能保持确定性。
+        window_end = min(
+            clock.now(),
+            datetime.combine(ctx.report_date + timedelta(days=1), datetime.min.time()),
+        )
+        since = window_end - timedelta(hours=ctx.app_cfg.pipeline.lookback_hours)
         raw_events = []
         degraded: list = []
         for provider in ctx.news_providers:

@@ -39,9 +39,12 @@ def build_daily_model(repo: Repository, report_date: date, summary: Optional[Dic
     # P1 cap: drop the OLDEST overflow — the report window overlaps the previous
     # day's evening report, so the oldest P1 items were already shown there.
     p1_hidden = 0
+    p1_overflow: List[Dict] = []
     if p1_cap:
         p1_idx = [i for i, e in enumerate(events) if e["importance"] == "P1"]
         p1_hidden = max(0, len(p1_idx) - p1_cap)
+        # 被裁掉的事件保留进 p1_overflow：日报尾部锚点索引仍为其提供证据回链目标
+        p1_overflow = [events[i] for i in p1_idx[:p1_hidden]]
         for i in reversed(p1_idx[:p1_hidden]):
             events.pop(i)
 
@@ -98,6 +101,7 @@ def build_daily_model(repo: Repository, report_date: date, summary: Optional[Dic
         "events": events,
         "metrics": repo.day_metrics(report_date),
         "p1_hidden": p1_hidden,
+        "p1_overflow": p1_overflow,
         "thesis_updates": thesis_updates,
         "company_impacts": company_impacts,
         "market": market,

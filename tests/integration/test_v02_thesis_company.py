@@ -108,7 +108,7 @@ def test_report_contains_v02_boards_and_thesis_file(pipeline_ctx) -> None:
     thesis_md = thesis_path.read_text(encoding="utf-8")
     assert "🟢 active" in thesis_md           # 状态徽章（DB 为准）
     assert "## 支持证据" in thesis_md
-    assert "[[Daily/2026-09-17#" in thesis_md  # 证据回链到日报事件锚点
+    assert "../Daily/2026-09-17.md#^" in thesis_md  # 证据回链（markdown 块引用）到日报事件锚点
 
     # 人工内容保护：在节外写一行私人笔记，重渲染后必须字节级保留
     human_note = "\n## 人工笔记（勿动）\n我的独立判断：需求周期未完。\n"

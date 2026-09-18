@@ -163,3 +163,22 @@ class DailySnapshotRow(Base):
 
     trade_date: Mapped[date] = mapped_column(DATE, primary_key=True)
     snapshot: Mapped[dict] = mapped_column(JSON, nullable=False)
+
+
+class LlmUsageRow(Base):
+    """V0.6: 跨进程 LLM 日用量账本（兜底熔断数据面，一天一行）。
+
+    2026-09-18 KeepAlive 事故：daily_budget_cny 原为进程内熔断，连环重启下每次清零。
+    每次调用后由 UsageStore 原子累加（col=col+n），BudgetGuard.check() 读当日累计。
+    """
+
+    __tablename__ = "llm_usage_daily"
+
+    usage_date: Mapped[date] = mapped_column(DATE, primary_key=True)
+    calls: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    input_tokens: Mapped[int] = mapped_column(BIGINT, nullable=False, server_default=text("0"))
+    output_tokens: Mapped[int] = mapped_column(BIGINT, nullable=False, server_default=text("0"))
+    cost_cny: Mapped[float] = mapped_column(DECIMAL(12, 6), nullable=False, server_default=text("0"))
+    updated_at: Mapped[datetime] = mapped_column(
+        DATETIME, nullable=False, server_default=text("CURRENT_TIMESTAMP")
+    )

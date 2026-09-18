@@ -58,7 +58,7 @@ def test_devil_advocate_weak_cap_and_daily_board(pipeline_ctx) -> None:
     assert "## 🔱 反方视角" in daily
     assert "mock 反方小结" in daily
     thesis_md = (ctx.vault_path / "Theses" / "ai-demand-growth.md").read_text(encoding="utf-8")
-    assert "（弱）" in thesis_md  # 反证以 weak 渲染进"反方证据"节
+    assert "| 2026-09-17 | 🔴 削弱 | 弱 |" in thesis_md  # 反证以 weak 行渲染进"反方证据"表格
 
 
 def test_weekly_command_end_to_end(pipeline_ctx) -> None:

@@ -15,6 +15,7 @@ class RunStatus(str, Enum):
     FAILED = "failed"
     DB_UNREACHABLE = "db_unreachable"
     SKIPPED = "skipped"
+    BLOCKED = "blocked"  # V0.6 兜底频率门拦截（run 数超限），CLI 以 exit 0 结束
 
 
 @dataclass

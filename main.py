@@ -47,6 +47,7 @@ def _build_ctx(report_date: _date, providers_mode: str, settings: Settings):
     from app.providers.llm.mock import MockLLMProvider
     from app.providers.llm.openai_compat import BudgetGuard, OpenAICompatLLMProvider
     from app.db.engine import get_session_factory
+    from app.db.usage import UsageStore
 
     app_cfg = get_app_config()
     sectors = get_sectors()
@@ -54,7 +55,8 @@ def _build_ctx(report_date: _date, providers_mode: str, settings: Settings):
     repo = Repository(session)
     seed_theses(session)  # 首次运行引导（幂等）
 
-    budget = BudgetGuard(app_cfg.llm.daily_budget_cny)
+    # V0.6 兜底：注入跨进程账本，daily_budget_cny 变为当日全局熔断线
+    budget = BudgetGuard(app_cfg.llm.daily_budget_cny, store=UsageStore())
     if providers_mode == "mock":
         llm = MockLLMProvider()
         news_names = ["mock"]
@@ -139,7 +141,8 @@ def cmd_daily(args) -> int:
     print(summary.print_report())
     if summary.status.value not in ("success", "skipped"):
         notify("investment-ai daily", "run %s: %s" % (summary.run_id[:8], summary.status.value))
-    return {"partial": 2, "failed": 3, "db_unreachable": 3}.get(summary.status.value, 0)
+    # blocked → 0：兜底门拦截后以成功码退出，不给 KeepAlive=SuccessfulExit:false 喂重启循环
+    return {"partial": 2, "failed": 3, "db_unreachable": 3, "blocked": 0}.get(summary.status.value, 0)
 
 
 def cmd_status(args) -> int:
@@ -188,10 +191,13 @@ def cmd_event(args) -> int:
 
 
 def cmd_render(args) -> int:
+    import re
+
     from app.db.engine import get_session_factory
     from app.db.repository import Repository
     from app.db.seed import seed_theses
-    from app.knowledge.renderer import ensure_skeletons
+    from app.knowledge.renderer import atomic_write, ensure_skeletons, get_section, replace_section
+    from app.knowledge.updater import industry_path
 
     settings = get_settings()
     session = get_session_factory()()
@@ -203,9 +209,67 @@ def cmd_render(args) -> int:
          "key_metrics": t.key_metrics, "status": t.status}
         for t in repo.list_theses()
     ]
-    vault = effective_vault_path(get_app_config(), settings)
-    created = ensure_skeletons(vault, get_sectors(), theses)
-    print("vault: %s（新建 %d 个骨架文件；已有文件永不覆盖）" % (vault, len(created)))
+    sectors = get_sectors()
+    app_cfg = get_app_config()
+    vault = effective_vault_path(app_cfg, settings)
+    created = ensure_skeletons(vault, sectors, theses)
+    if not args.all:
+        print("vault: %s（新建 %d 个骨架文件；已有文件永不覆盖；--all 从 DB 全量重渲染）" % (vault, len(created)))
+        return 0
+
+    # --all：以 DB 为真值重渲染既有产物（渲染格式升级 / 文件损坏后的恢复入口）。
+    # write_daily_report 内部会同步重渲染全部 Thesis 长文件（滚动窗以 DB 为准）；
+    # 历史重放不带当次运行的 status_changes 标注，Thesis 状态以 DB 当前值为准。
+    from app.report.daily import write_daily_report
+
+    dates = sorted(
+        p.stem for p in (vault / "Daily").glob("*.md")
+        if len(p.stem) == 10 and p.stem[4] == "-"
+    )
+    for stem in dates:
+        d = _date.fromisoformat(stem)
+        summary_row = repo.get_analysis_for_date(d, "daily_summary")
+        write_daily_report(
+            repo, d, (summary_row.result_json if summary_row else None),
+            vault, theses, sectors, p1_cap=app_cfg.pipeline.daily_p1_cap,
+        )
+
+    # 存量修复：行业 changelog 旧格式表格补分隔行；系统文件 marker 与正文间距规范化
+    # （紧贴 HTML 注释的表格在 Obsidian 实时预览中不渲染，必须空行分隔）
+    # 链接迁移（含被 Obsidian 表格编辑器劈开的形式）→ markdown 链接：
+    #   [[Daily/date#^eXXXX\|label]] / [[Daily/date#eXXXX | label]] → [label](../Daily/date.md#^eXXXX)
+    #   [[Theses/id\|label]] → [label](../Theses/id.md)
+    # markdown 链接不含竖线，表格编辑器重排单元格时不会再被破坏
+    from app.knowledge.renderer import normalize_section_spacing
+
+    def _daily_link(m: "re.Match") -> str:
+        d, anc, disp = m.group(1), m.group(2), m.group(3).strip()
+        return "[%s](../Daily/%s.md#^%s)" % (disp or d, d, anc)
+
+    daily_link_re = re.compile(r"\[\[Daily/(\d{4}-\d{2}-\d{2})#\^?(e[0-9a-f]{4})\s*\\?\|\s*([^\]]*)\]\]")
+    thesis_link_re = re.compile(r"\[\[Theses/([a-z0-9-]+)\\?\|\s*([^\]]*)\]\]")
+    fixed = 0
+    targets = [industry_path(vault, key, sectors) for key in sectors.keys()]
+    targets += [vault / "Theses" / ("%s.md" % t["id"]) for t in theses]
+    targets += list((vault / "Weekly").glob("*.md"))
+    for path in targets:
+        if not path.exists():
+            continue
+        text = path.read_text(encoding="utf-8")
+        body = get_section(text, "changelog") if path.parent.name == "Industries" else None
+        if body is not None and not any(ln.startswith("|---") for ln in body.splitlines()):
+            body_lines = body.splitlines()
+            if body_lines and body_lines[0].startswith("|"):
+                body_lines.insert(1, "|---|---|---|")
+                text = replace_section(text, "changelog", "\n".join(body_lines))
+        new_text = normalize_section_spacing(
+            thesis_link_re.sub(lambda m: "[%s](../Theses/%s.md)" % (m.group(2).strip() or m.group(1), m.group(1)),
+                               daily_link_re.sub(_daily_link, text))
+        )
+        if new_text != text:
+            atomic_write(path, new_text)
+            fixed += 1
+    print("vault 重渲染: %s（骨架新建 %d · 日报 %d 篇 · 存量格式修复 %d 个文件）" % (vault, len(created), len(dates), fixed))
     return 0
 
 
@@ -262,11 +326,17 @@ def cmd_backfill(args) -> int:
 
 def cmd_weekly(args) -> int:
     from app.report.weekly import generate_weekly
+    from app.pipeline.orchestrator import run_gate_check
 
     settings = get_settings()
     report_date = _date.fromisoformat(args.date) if args.date else clock.today()
     ctx = _build_ctx(report_date, args.providers, settings)
     setup_logging(run_id=ctx.run_id)
+    gate = run_gate_check(ctx)  # 兜底频率门同样覆盖 weekly（L3 调用更贵）
+    if gate is not None:
+        notify("investment-ai weekly", "run gate blocked: %s" % gate)
+        print("run gate: 已拦截 %s" % gate)
+        return 0
     path = generate_weekly(ctx.engine, ctx.repo, ctx.vault_path, report_date, force=args.force)
     if path is None:
         print("weekly review 失败（详见日志）")
@@ -293,8 +363,8 @@ def main(argv: List[str] = None) -> int:
     p_event.add_argument("event_id")
     p_event.set_defaults(func=cmd_event)
 
-    p_render = sub.add_parser("render", help="重建 vault 骨架（缺失文件）")
-    p_render.add_argument("--all", action="store_true")
+    p_render = sub.add_parser("render", help="重建 vault 骨架；--all 以 DB 为真值重渲染既有日报/Thesis")
+    p_render.add_argument("--all", action="store_true", help="全量重渲染（日报 + Thesis + changelog 表头修复）")
     p_render.set_defaults(func=cmd_render)
 
     p_thesis = sub.add_parser("thesis", help="Thesis 管理")

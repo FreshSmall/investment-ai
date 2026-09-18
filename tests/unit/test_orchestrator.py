@@ -26,6 +26,9 @@ class FakeRepo:
     def latest_run(self, report_date, command="daily"):
         return FakeRunRow(self.existing_status) if self.existing_status else None
 
+    def count_runs_since(self, since):
+        return 0  # 兜底频率门：单测默认无历史 run
+
     def create_run(self, run_id, command, report_date, started_at):
         self.created.append(run_id)
 

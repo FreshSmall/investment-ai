@@ -102,8 +102,9 @@ def render_weekly_md(model: Dict) -> str:
         lines.append("| Thesis | 状态 | 支持 | 反对(weak) |")
         lines.append("|---|---|---|---|")
         for t in thesis_stats:
-            lines.append("| [[Theses/%s\\|%s]] | %s | %d | %d(%d) |" % (
-                t["id"], t["title"], t["status"], t["supporting"], t["contradicting"], t["weak_contra"],
+            # markdown 链接（无竖线）：表格内 wikilink 的 \| 转义会被 Obsidian 表格编辑器破坏
+            lines.append("| [%s](../Theses/%s.md) | %s | %d | %d(%d) |" % (
+                t["title"], t["id"], t["status"], t["supporting"], t["contradicting"], t["weak_contra"],
             ))
         lines.append("")
     return "\n".join(lines)

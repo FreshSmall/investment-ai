@@ -35,10 +35,29 @@ def anchor(event_id: str) -> str:
     return "e" + event_id[:4]
 
 
+def _clip(text: str, limit: int) -> str:
+    """单行展示的板块备注：折叠换行，超限截断补省略号（避免句子被无声切半）。"""
+    text = (text or "").replace("\n", " ").strip()
+    if len(text) <= limit:
+        return text
+    return text[:limit].rstrip() + "…"
+
+
+def _fmt_pct(v) -> str:
+    try:
+        return "%+.2f%%" % float(v)
+    except (TypeError, ValueError):
+        return "%s%%" % v
+
+
 def replace_section(text: str, name: str, new_body: str, version: int = 1, as_of: str = "") -> str:
-    """Replace one section's body; bytes outside every section are untouched."""
-    marker_start = "<!-- IAI:SECTION:%s START (v%s%s) -->\n" % (name, version, ", " + as_of if as_of else "")
-    marker_end = "\n<!-- IAI:SECTION:%s END -->" % name
+    """Replace one section's body; bytes outside every section are untouched.
+
+    marker 与正文之间强制空行：紧贴 HTML 注释的表格/列表会被 Obsidian
+    （尤其实时预览）的解析器吞进注释块而不渲染。
+    """
+    marker_start = "<!-- IAI:SECTION:%s START (v%s%s) -->\n\n" % (name, version, ", " + as_of if as_of else "")
+    marker_end = "\n\n<!-- IAI:SECTION:%s END -->" % name
     replacement = marker_start + new_body + marker_end
 
     pattern = re.compile(
@@ -58,7 +77,14 @@ def get_section(text: str, name: str) -> Optional[str]:
         re.DOTALL,
     )
     m = pattern.search(text)
-    return m.group(1) if m else None
+    return m.group(1).strip("\n") if m else None
+
+
+def normalize_section_spacing(text: str) -> str:
+    """存量文件迁移：marker 与正文之间补空行（不改任何 marker/正文字节）。"""
+    text = re.sub(r"(<!-- IAI:SECTION:[a-z_]+ START[^>]*-->)\n([^\n])", r"\1\n\n\2", text)
+    text = re.sub(r"([^\n])\n(<!-- IAI:SECTION:[a-z_]+ END -->)", r"\1\n\n\2", text)
+    return text
 
 
 def atomic_write(path: Path, content: str) -> None:
@@ -78,7 +104,9 @@ def industry_skeleton(sector_key: str, sectors: SectorsCfg) -> str:
         title = INDUSTRY_SECTION_TITLES.get(section, section)
         lines.append("## %s" % title)
         lines.append("<!-- IAI:SECTION:%s START (v1) -->" % section)
-        lines.append("（待首次更新）" if section != "changelog" else "| 日期 | 变化 | 证据 |")
+        lines.append("")
+        lines.append("（待首次更新）" if section != "changelog" else "| 日期 | 变化 | 证据 |\n|---|---|---|")
+        lines.append("")
         lines.append("<!-- IAI:SECTION:%s END -->" % section)
         lines.append("")
     return "\n".join(lines)
@@ -102,7 +130,9 @@ def thesis_skeleton(thesis: Dict) -> str:
     for section in ("hypothesis", "evidence_for", "evidence_against", "falsification", "metrics", "latest_changes"):
         lines.append("## %s" % THESIS_SECTION_TITLES[section])
         lines.append("<!-- IAI:SECTION:%s START (v1) -->" % section)
+        lines.append("")
         lines.append(bodies[section])
+        lines.append("")
         lines.append("<!-- IAI:SECTION:%s END -->" % section)
         lines.append("")
     return "\n".join(lines)
@@ -141,13 +171,25 @@ def ensure_skeletons(vault: Path, sectors: SectorsCfg, theses: List[Dict]) -> Li
 
 _STATUS_LINE_RE = re.compile(r"^> Thesis 状态: .*$", re.MULTILINE)
 
+_EVIDENCE_TABLE_HEADER = "| 日期 | 方向 | 强弱 | 证据 | 来源 |"
 
-def _evidence_line(ev: Dict) -> str:
-    badge = DIRECTION_BADGES.get(ev.get("direction", "neutral"), ev.get("direction", "?"))
-    weight = "强" if ev.get("weight") == "strong" else "弱"
-    note = (ev.get("note") or "").replace("\n", " ").strip()
-    link = "[[Daily/%s#%s|%s]]" % (ev.get("review_date"), anchor(ev.get("event_id", "")), ev.get("review_date"))
-    return "- %s（%s）%s — %s" % (badge, weight, note, link)
+
+def _evidence_table(rows: List[Dict]) -> str:
+    """证据滚动窗渲染为表格：列对齐 + 日期可扫读，替代单行长列表。"""
+    if not rows:
+        return "（暂无证据记录）"
+    lines = [_EVIDENCE_TABLE_HEADER, "|---|---|---|---|---|"]
+    for ev in rows:
+        badge = DIRECTION_BADGES.get(ev.get("direction", "neutral"), ev.get("direction", "?"))
+        weight = "强" if ev.get("weight") == "strong" else "弱"
+        note = (ev.get("note") or "").replace("\n", " ").replace("|", "／").strip()
+        if ev.get("event_id"):
+            # markdown 链接（无竖线）：表格内 wikilink 的 \| 转义会被 Obsidian 表格编辑器破坏
+            link = "[↗](../Daily/%s.md#^%s)" % (ev.get("review_date"), anchor(ev["event_id"]))
+        else:
+            link = ev.get("review_date", "")
+        lines.append("| %s | %s | %s | %s | %s |" % (ev.get("review_date"), badge, weight, note, link))
+    return "\n".join(lines)
 
 
 def write_thesis_file(vault: Path, thesis: Dict, evidence_rows: List[Dict]) -> Path:
@@ -186,16 +228,13 @@ def write_thesis_file(vault: Path, thesis: Dict, evidence_rows: List[Dict]) -> P
     recent = evidence_rows[:20]
     for section, direction in (("evidence_for", "supporting"), ("evidence_against", "contradicting")):
         rows = [e for e in recent if e.get("direction") == direction]
-        text = replace_section(
-            text, section,
-            "\n".join(_evidence_line(e) for e in rows) or "（暂无证据记录）",
-        )
+        text = replace_section(text, section, _evidence_table(rows))
     changes = evidence_rows[:10]
     text = replace_section(
         text, "latest_changes",
         "\n".join(
             "- %s %s" % (e.get("review_date"), DIRECTION_BADGES.get(e.get("direction", "neutral"), ""))
-            + ("：{}".format((e.get("note") or "").replace("\n", " ").strip()[:80]) if e.get("note") else "")
+            + ("：%s" % _clip(e.get("note") or "", 80) if e.get("note") else "")
             for e in changes
         ) or "（暂无变化记录）",
     )
@@ -209,12 +248,16 @@ def write_thesis_file(vault: Path, thesis: Dict, evidence_rows: List[Dict]) -> P
 
 def _source_footer(ev: Dict) -> str:
     url_part = "[原文](%s)" % ev["source_url"] if ev.get("source_url") else "无链接"
-    return "> 来源: %s · %s · %s · event:%s" % (
+    footer = "> 来源: %s · %s · %s · event:%s" % (
         ev.get("source_name", ev.get("source", "?")),
         ev.get("published_at", "?"),
         url_part,
         ev.get("event_id", "?"),
     )
+    # 块锚点：Thesis 证据表 / 行业 changelog 的回链通过 [[Daily/date#^anchor]] 跳到该事件
+    if ev.get("event_id"):
+        footer += " ^%s" % anchor(ev["event_id"])
+    return footer
 
 
 def render_daily_md(model: Dict) -> str:
@@ -252,18 +295,39 @@ def render_daily_md(model: Dict) -> str:
             if ev.get("analysis"):
                 a = ev["analysis"]
                 lines.append("**摘要**：%s" % a.get("summary", ""))
-                if a.get("causal_chain"):
+                chain = [s.strip() for s in (a.get("causal_chain") or []) if (s or "").strip()]
+                if chain:
                     lines.append("")
-                    lines.append("**因果链**：%s" % " → ".join(a["causal_chain"]))
-                if a.get("uncertainty"):
+                    lines.append("**因果链**")
                     lines.append("")
-                    lines.append("**不确定性**：%s" % "；".join(a["uncertainty"]))
+                    # 首行为起点，后续以 → 前缀竖排传导方向（单段箭头长链不可读）
+                    lines.extend("- %s" % (s if not out_idx else "→ %s" % s)
+                                 for out_idx, s in enumerate(chain))
+                uncertainties = [u.strip() for u in (a.get("uncertainty") or []) if (u or "").strip()]
+                if uncertainties:
+                    lines.append("")
+                    lines.append("**不确定性**")
+                    lines.append("")
+                    lines.extend("- %s" % u for u in uncertainties)
             lines.append("")
             lines.append(_source_footer(ev))
             lines.append("")
     p1_hidden = model.get("p1_hidden") or 0
     if events and p1_hidden:
         lines.append("*注：另有 %d 条 P1 事件未展开（超出日报 P1 展示上限，按时间保留最近条目）。*" % p1_hidden)
+        lines.append("")
+    # 未展开事件锚点索引：证据回链 [[Daily/date#^anchor]] 的落点（被裁掉的事件没有正文块）
+    overflow = model.get("p1_overflow") or []
+    if overflow:
+        lines.append("## 未展开事件索引")
+        lines.append("")
+        lines.append("*超出展示上限的 P1 事件，仅保留标题与事件 id 供证据回链定位。*")
+        lines.append("")
+        for ev in overflow:
+            item = "- %s · event:%s" % (_clip(ev.get("title") or "", 40), ev.get("event_id") or "?")
+            if ev.get("event_id"):
+                item += " ^%s" % anchor(ev["event_id"])
+            lines.append(item)
         lines.append("")
     if not events:
         lines.append("## 平静日")
@@ -277,14 +341,15 @@ def render_daily_md(model: Dict) -> str:
         lines.append("## 市场复盘")
         lines.append("")
         if market.get("indices"):
-            idx_line = " · ".join(
-                "%s %s%%（%s 亿）" % (i.get("name", "?"), i.get("change_pct", 0), i.get("amount_yi", 0))
-                for i in market["indices"]
-            )
-            lines.append("*指数*：%s" % idx_line)
+            lines.append("| 指数 | 涨跌幅 | 成交额(亿) |")
+            lines.append("|---|---|---|")
+            for i in market["indices"]:
+                lines.append("| %s | %s | %s |" % (
+                    i.get("name", "?"), _fmt_pct(i.get("change_pct", 0)), i.get("amount_yi", 0),
+                ))
             lines.append("")
         if market.get("sectors_top"):
-            top_line = "、".join("%s %s%%" % (s.get("name", "?"), s.get("change_pct", 0)) for s in market["sectors_top"][:3])
+            top_line = "、".join("%s %s" % (s.get("name", "?"), _fmt_pct(s.get("change_pct", 0))) for s in market["sectors_top"][:3])
             lines.append("*领涨*：%s" % top_line)
             lines.append("")
         if review.get("market_summary"):
@@ -302,9 +367,9 @@ def render_daily_md(model: Dict) -> str:
         lines.append("## 🔱 反方视角（Devil's Advocate）")
         lines.append("")
         for d in devil_notes:
-            lines.append("- **%s**：%s" % (d.get("title", "?"), (d.get("overall_note") or "").replace("\n", " ")[:140]))
+            lines.append("- **%s**：%s" % (d.get("title", "?"), _clip(d.get("overall_note") or "", 140)))
             for cp in (d.get("counter_points") or [])[:2]:
-                lines.append("  - %s" % (cp.get("text", "")[:120]))
+                lines.append("  - %s" % _clip(cp.get("text", ""), 120))
         lines.append("")
     # V0.2: thesis review board
     thesis_updates = model.get("thesis_updates") or []
@@ -316,7 +381,7 @@ def render_daily_md(model: Dict) -> str:
             status_note = "（状态变更 → %s）" % t["new_status"] if t.get("status_changed") else ""
             lines.append("- **%s**：%s%s — %s [[Theses/%s|→]]" % (
                 t.get("title", t.get("thesis_id")), badge, status_note,
-                (t.get("note") or "").replace("\n", " ")[:120], t.get("thesis_id"),
+                _clip(t.get("note") or "", 120), t.get("thesis_id"),
             ))
         lines.append("")
     company_impacts = model.get("company_impacts") or []
@@ -327,7 +392,7 @@ def render_daily_md(model: Dict) -> str:
             companies = "、".join(x.get("name", "?") for x in c.get("companies", [])[:4]) or "—"
             lines.append("- **%s**（%s）：%s" % (
                 companies, c.get("importance", ""),
-                (c.get("summary") or "").replace("\n", " ")[:140],
+                _clip(c.get("summary") or "", 140),
             ))
         lines.append("")
     watch = (summary or {}).get("tomorrow_watch") or []
@@ -345,7 +410,17 @@ def render_daily_md(model: Dict) -> str:
     if stable_metrics:
         lines.append("## 运行指标")
         lines.append("")
-        for k in sorted(stable_metrics):
-            lines.append("- %s: %s" % (k, stable_metrics[k]))
+        if "events_new_today" in stable_metrics:
+            lines.append("- 新增事件: %s" % stable_metrics["events_new_today"])
+        dist = stable_metrics.get("by_importance")
+        if isinstance(dist, dict) and dist:
+            lines.append("- 重要性分布: %s" % " · ".join("%s %s" % (k, dist[k]) for k in sorted(dist)))
+        if "analyses_today" in stable_metrics:
+            lines.append("- 当日分析: %s" % stable_metrics["analyses_today"])
+        if "estimated_cost_cny" in stable_metrics:
+            try:
+                lines.append("- 预估成本: ¥%.2f" % float(stable_metrics["estimated_cost_cny"]))
+            except (TypeError, ValueError):
+                lines.append("- 预估成本: %s" % stable_metrics["estimated_cost_cny"])
         lines.append("")
     return "\n".join(lines)

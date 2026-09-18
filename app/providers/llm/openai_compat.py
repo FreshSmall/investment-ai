@@ -31,21 +31,55 @@ class BudgetExceeded(Exception):
 
 
 class BudgetGuard:
-    def __init__(self, budget_cny: float) -> None:
+    """当日预算熔断。
+
+    V0.6 起支持跨进程全局账本：注入 store（UsageStore）后，check() 读
+    llm_usage_daily 当日累计、record() 每次调用后立即落账，连环重启的多个
+    进程共享同一条熔断线。store 不可达时保守熔断（fail-closed）——DB 挂了
+    分析结果也存不进去，继续付费没有意义。
+    """
+
+    def __init__(self, budget_cny: float, store=None, today_fn=None) -> None:
         self.budget = budget_cny
         self.total_cny = 0.0
         self.exceeded = False
-
-    def add(self, cost_cny: float) -> None:
-        self.total_cny += cost_cny
-        if self.total_cny >= self.budget:
-            self.exceeded = True
+        self._store = store
+        self._today = today_fn if today_fn is not None else _default_today
 
     def check(self) -> None:
-        if self.exceeded:
+        if self._store is not None:
+            try:
+                spent = self._store.cost_for(self._today())
+            except Exception as e:  # SQLAlchemyError 等：账本不可达 → 保守停
+                raise BudgetExceeded("LLM 用量账本不可达（DB），保守熔断: %s" % str(e)[:80])
+            if self.exceeded or spent >= self.budget:
+                raise BudgetExceeded(
+                    "当日 LLM 预算已用尽（%.2f/%.2f CNY），停止深度分析" % (spent, self.budget)
+                )
+        elif self.exceeded:  # 无 store：保持原进程内语义（记账后才可能超限）
             raise BudgetExceeded(
                 "当日 LLM 预算已用尽（%.2f/%.2f CNY），停止深度分析" % (self.total_cny, self.budget)
             )
+
+    def record(self, input_tokens: int, output_tokens: int, cost_cny: float) -> None:
+        self.total_cny += cost_cny
+        if self.total_cny >= self.budget:
+            self.exceeded = True
+        if self._store is not None:
+            try:
+                self._store.bump(self._today(), 1, input_tokens, output_tokens, cost_cny)
+            except Exception:
+                self.exceeded = True  # 账本写不进 → 下一次 check 必拦
+
+    def add(self, cost_cny: float) -> None:
+        """兼容旧调用（仅成本，无 token 明细）。"""
+        self.record(0, 0, cost_cny)
+
+
+def _default_today():
+    from app.core import clock
+
+    return clock.today()
 
 
 class OpenAICompatLLMProvider(LLMProvider):

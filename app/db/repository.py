@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.dialects.mysql import insert as mysql_insert
 from sqlalchemy.orm import Session
 
@@ -281,6 +281,11 @@ class Repository:
                 select(RunRow).order_by(RunRow.started_at.desc()).limit(days * 4)
             )
         )
+
+    def count_runs_since(self, since: datetime) -> int:
+        """兜底频率门数据源：started_at 以来的 run 数（含崩溃未落终态的）。"""
+        stmt = select(func.count()).select_from(RunRow).where(RunRow.started_at >= since)
+        return int(self._s.scalar(stmt) or 0)
 
     # ---------------- reports ----------------
 

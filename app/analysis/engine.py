@@ -100,6 +100,7 @@ class AnalysisEngine:
             self.total_input_tokens += result.input_tokens
             self.total_output_tokens += result.output_tokens
             self.total_cost_cny += result.cost_cny
+            self._budget.record(result.input_tokens, result.output_tokens, result.cost_cny)
             if not result.ok:
                 last_error = result.error or "provider error"
                 if attempt == 2:
@@ -135,7 +136,6 @@ class AnalysisEngine:
                 cost_cny=result.cost_cny,
                 refresh=(strategy.scope in ("aggregate", "thesis")),
             )
-            self._budget.add(result.cost_cny)
             return AnalysisOutcome(
                 strategy=strategy.name,
                 ok=True,

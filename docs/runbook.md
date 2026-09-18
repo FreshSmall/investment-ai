@@ -128,7 +128,28 @@ cur.execute('CREATE DATABASE investment_ai_test CHARACTER SET utf8mb4'); print('
 
 - 单次运行成本在执行报告 `estimated_cost_cny`（正常 ~¥0.5~1.5/天，两次运行翻倍但共享缓存）
 - 月度汇总：`SELECT DATE(started_at) d, SUM(JSON_EXTRACT(stats_json,'$.estimated_cost_cny')) c FROM runs GROUP BY d ORDER BY d DESC LIMIT 30;`
-- 熔断线 ¥10/天在 `settings.yaml`；分析行级成本在 `analyses.cost_cny`
+- 熔断线 ¥5/天在 `settings.yaml`（V0.6 起跨进程全局）；分析行级成本在 `analyses.cost_cny`
+
+## 6.1 兜底拦截（V0.6，2026-09-18 KeepAlive 事故后）
+
+事故：launchd `KeepAlive/SuccessfulExit=true`（语义配反）导致 daily 成功退出即重拉，
+8 小时连环 172 run / 3121 次调用 / ¥118。进程内预算每次重启清零，完全失效。
+
+两层应用内兜底（不依赖调度层配置正确性，状态都在 DB）：
+
+1. **run 频率门**（`orchestrator.run_gate_check`）：run 启动前查 `runs` 表，
+   近 1 小时 ≥ `run_gate_max_per_hour`(8) 或当日 ≥ `run_gate_max_per_day`(20) →
+   run 以 `blocked` 状态落库并立刻退出，**不执行任何步骤、零 LLM 调用**；
+   CLI 退出码 0（不给 KeepAlive=SuccessfulExit:false 喂重启循环）。
+2. **跨进程成本熔断**（`BudgetGuard` + `llm_usage_daily` 表）：每次 LLM 调用后
+   原子累加当日用量，每次分析前读当日累计，≥ `daily_budget_cny`(5) → 降级停深度分析。
+   账本不可达（DB 挂）时保守熔断（fail-closed）。
+
+排查命令：
+- 当日用量：`SELECT * FROM llm_usage_daily WHERE usage_date = CURDATE();`
+- 被拦截的 run：`SELECT run_id, started_at, stats_json FROM runs WHERE status='blocked' ORDER BY started_at DESC;`
+- 解除频率门：等窗口滑过（小时门）或次日（日门）自动恢复；如确需立即重跑，
+  清理当日 runs 记录前先确认不是调度层仍在连环触发。
 
 ## 7. 观察期验收（进行中）
 

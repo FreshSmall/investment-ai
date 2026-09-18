@@ -42,11 +42,12 @@
     <key>StandardErrorPath</key>
     <string>/Users/bjhl/IdeaProjects/learn-project/investment-ai/logs/daily-launchd.log</string>
 
-    <!-- 上次异常退出后 60s 重启一次（watchdog 超时 os._exit(99) 场景） -->
+    <!-- 仅异常退出时重启（watchdog 超时 os._exit(99) 场景）；SuccessfulExit=true 会导致
+         每次正常跑完立即重拉、无限连环调用 LLM（2026-09-18 事故根因） -->
     <key>KeepAlive</key>
     <dict>
         <key>SuccessfulExit</key>
-        <true/>
+        <false/>
     </dict>
     <key>ThrottleInterval</key>
     <integer>60</integer>

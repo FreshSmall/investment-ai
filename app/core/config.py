@@ -77,6 +77,8 @@ class PipelineCfg(BaseModel):
     near_dup_hours: int = 48          # 同题归并回看窗口
     near_dup_jaccard: float = 0.6     # 标题 bigram Jaccard 阈值
     near_dup_lcs_chars: int = 10      # 最长公共子串阈值（防定期栏目误合并）
+    run_gate_max_per_hour: int = 8    # 兜底频率门：近 1 小时 run 数上限，超限 blocked（正常 2/天）
+    run_gate_max_per_day: int = 20    # 兜底频率门：当日 run 数上限（含 weekly 与手动重跑）
 
 
 class LlmCfg(BaseModel):

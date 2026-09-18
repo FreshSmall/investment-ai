@@ -20,6 +20,9 @@ from app.knowledge.sections import INDUSTRY_SECTION_TITLES
 UPDATABLE_SECTIONS = ["overview", "supply_demand", "catalysts", "risks", "metrics"]
 _CHANGELOG_MAX_ROWS = 30
 _PLACEHOLDER = "（待首次更新）"
+# 分隔行是 Obsidian/GFM 渲染表格的硬性要求，缺失时整表退化为普通段落
+_CHANGELOG_HEADER = "| 日期 | 变化 | 证据 |"
+_CHANGELOG_SEP = "|---|---|---|"
 
 
 def industry_path(vault: Path, sector_key: str, sectors: SectorsCfg) -> Path:
@@ -72,16 +75,20 @@ def apply_industry_update(
         new_lines = []
         for r in rows[:4]:
             ev = r.get("evidence_event_id", "")
-            link = "[[Daily/%s#e%s|%s]]" % (report_date, ev[:4], report_date) if ev else report_date
+            # 表格内链接用 markdown 形式（无竖线）：Obsidian 表格编辑器不识别 wikilink 的
+            # \| 转义，会在表格操作时把单元格劈开；#^ 块引用跳转到日报事件块
+            link = "[%s](../Daily/%s.md#^e%s)" % (report_date, report_date, ev[:4]) if ev else report_date
             change = (r.get("change") or "").replace("|", "/").replace("\n", " ").strip()
             new_lines.append("| %s | %s | %s |" % (report_date, change, link))
-        header = "| 日期 | 变化 | 证据 |"
-        existing = get_section(text, "changelog") or header
-        old_rows = [ln for ln in existing.splitlines() if ln.startswith("|") and ln != header]
+        existing = get_section(text, "changelog") or _CHANGELOG_HEADER
+        old_rows = [
+            ln for ln in existing.splitlines()
+            if ln.startswith("|") and ln not in (_CHANGELOG_HEADER, _CHANGELOG_SEP)
+        ]
         # 同日重跑幂等：先剔除该日期旧行，再 prepend 当日新行（当日变化集整体替换）
         day_prefix = "| %s |" % report_date
         old_rows = [ln for ln in old_rows if not ln.startswith(day_prefix)]
-        table = "\n".join([header] + new_lines + old_rows[:_CHANGELOG_MAX_ROWS - len(new_lines)])
+        table = "\n".join([_CHANGELOG_HEADER, _CHANGELOG_SEP] + new_lines + old_rows[:_CHANGELOG_MAX_ROWS - len(new_lines)])
         text = replace_section(text, "changelog", table, as_of=report_date)
         added = len(new_lines)
 

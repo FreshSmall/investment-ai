@@ -14,6 +14,8 @@ pipeline:
   near_dup_hours: 48          # 同题归并：与近 N 小时已入库事件+本批内候选做标题相似度比对
   near_dup_jaccard: 0.6       # 标题 bigram Jaccard 阈值（2026-09-17 实测 307 标题校准）
   near_dup_lcs_chars: 10      # 最长公共子串阈值，双条件防"早/晚间新闻精选"类栏目误合并
+  run_gate_max_per_hour: 8    # 兜底频率门：近1小时 run 数超限 → blocked（拦截调度器连环重跑，2026-09-18 KeepAlive 事故）
+  run_gate_max_per_day: 20    # 兜底频率门：当日 run 数上限（正常 daily 2/天 + 周末 weekly + 手动重跑）
 
 llm:
   # 全 DeepSeek（api.deepseek.com/v1 + .env 的 LLM_API_KEY）
@@ -28,4 +30,5 @@ llm:
     deepseek-chat: {input_per_m: 4.0, output_per_m: 16.0}
     deepseek-v4-pro: {input_per_m: 8.0, output_per_m: 24.0}
   min_call_interval_seconds: 2  # LLM 串行调用最小间隔（防 RPM 限流）
-  daily_budget_cny: 5.0         # 当日 LLM 成本熔断线
+  daily_budget_cny: 5.0         # 当日 LLM 成本熔断线（V0.6 起跨进程全局：llm_usage_daily 当日累计，
+                               # 连环重启不再清零；2026-09-18 实测正常日 ¥1~2.5，最重日 ≈¥3）

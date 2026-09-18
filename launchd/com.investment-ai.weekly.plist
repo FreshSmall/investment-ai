@@ -38,7 +38,7 @@
     <key>KeepAlive</key>
     <dict>
         <key>SuccessfulExit</key>
-        <true/>
+        <false/>
     </dict>
     <key>ThrottleInterval</key>
     <integer>60</integer>

@@ -45,7 +45,9 @@ def test_apply_update_rewrites_only_changed_sections(tmp_path) -> None:
     assert "被忽略的假内容" not in text          # changed=false 的内容不落地
     assert "（待首次更新）" in text               # 其余节保持骨架占位
     assert human in text                          # 人工内容字节级保留
-    assert "| 2026-09-17 | 景气上行 | [[Daily/2026-09-17#eaddf|2026-09-17]] |" in text
+    assert "| 日期 | 变化 | 证据 |\n|---|---|---|" in text  # 表头必须带分隔行（Obsidian 渲染要求）
+    # 表格内链接为 markdown 形式（无竖线，Obsidian 表格编辑器重排不会破坏）+ 块引用锚点
+    assert "| 2026-09-17 | 景气上行 | [2026-09-17](../Daily/2026-09-17.md#^eaddf) |" in text
 
 
 def test_changelog_rolling_window_and_prepend(tmp_path) -> None:

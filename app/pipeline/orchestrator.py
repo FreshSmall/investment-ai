@@ -8,8 +8,8 @@ Failure taxonomy (steps handle item/source-level failures themselves and stay ok
 from __future__ import annotations
 
 import uuid
-from datetime import date
-from typing import Callable, List
+from datetime import date, datetime, time as dtime, timedelta
+from typing import Callable, List, Optional
 
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
 
@@ -25,6 +25,27 @@ class StepError(Exception):
 
 class SystemUnavailable(Exception):
     """External DB unreachable — fast exit."""
+
+
+def run_gate_check(ctx: StepContext) -> Optional[dict]:
+    """跨 run 频率兜底门：近 1 小时 / 当日 run 数超限 → 返回拦截 stats（None 放行）。
+
+    依据 runs 表 started_at 计数（含崩溃未落终态的 run——它们照样烧钱）。
+    阈值远高于正常节奏（daily 2/天 + 周末 weekly + 手动重跑）。
+    """
+    cfg = ctx.app_cfg.pipeline
+    now_dt = clock.now()
+    hour_count = ctx.repo.count_runs_since(now_dt - timedelta(hours=1))
+    day_count = ctx.repo.count_runs_since(datetime.combine(clock.today(), dtime.min))
+    if hour_count < cfg.run_gate_max_per_hour and day_count < cfg.run_gate_max_per_day:
+        return None
+    return {
+        "blocked_reason": "run_gate",
+        "runs_last_hour": hour_count,
+        "runs_today": day_count,
+        "max_per_hour": cfg.run_gate_max_per_hour,
+        "max_per_day": cfg.run_gate_max_per_day,
+    }
 
 
 class Step:
@@ -53,6 +74,20 @@ class Orchestrator:
                     run_id=run_id, command=command, report_date=ctx.report_date,
                     status=RunStatus.SKIPPED, started_at=started, finished_at=clock.now(),
                     stats={"skipped_reason": "already_succeeded"},
+                )
+            # S0.5 兜底频率门（2026-09-18 KeepAlive 连环重跑事故）：调度层配置错误
+            # 导致的连环 run，在烧任何 LLM 调用之前拦截；blocked 以 exit 0 结束，
+            # 不给 KeepAlive=SuccessfulExit:false 喂重启循环。
+            gate = run_gate_check(ctx)
+            if gate is not None:
+                ctx.repo.create_run(run_id, command, ctx.report_date, started)
+                finished = clock.now()
+                ctx.repo.finish_run(run_id, RunStatus.BLOCKED, finished, gate)
+                self._log.error("run gate: 已拦截（连环重跑兜底）", extra={"ctx": gate})
+                return RunSummary(
+                    run_id=run_id, command=command, report_date=ctx.report_date,
+                    status=RunStatus.BLOCKED, started_at=started, finished_at=finished,
+                    stats=gate,
                 )
             ctx.repo.create_run(run_id, command, ctx.report_date, started)
         except (OperationalError, SQLAlchemyError) as e:
