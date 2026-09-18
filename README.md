@@ -1,4 +1,5 @@
-# investment-ai
+# AI投资系统
+investment-ai
 
 个人 AI 投资研究系统：数据采集 → 清洗去重 → AI 分类分级 → 深度分析 → Obsidian 知识沉淀 → Daily Review。
 
