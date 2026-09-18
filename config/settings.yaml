@@ -6,7 +6,7 @@ news_providers: [cls, eastmoney]
 
 pipeline:
   lookback_hours: 26          # 采集回看窗口（重叠窗口 + 幂等去重兜底，无需水位表）
-  classify_batch_size: 12     # L1 分类每批事件数（批输出 JSON 约需 1.5~2K tokens）
+  classify_batch_size: 8      # L1 分类每批事件数（批输出需 < max_tokens；12 条实测截断→8）
   watchdog_minutes: 30        # 单次 pipeline 总时长熔断
   llm_timeout_seconds: 60
   daily_p1_cap: 30            # 日报渲染 P1 条数上限（按发布时间取前 N；P0 不设限），超出部分在日报尾部提示条数
@@ -18,9 +18,10 @@ pipeline:
 llm:
   # 全 DeepSeek（api.deepseek.com/v1 + .env 的 LLM_API_KEY）
   # 三档分层（架构 §7）：L1 便宜档分类 / L2 标准档分析 / L3 旗舰档复盘（V0.5 起）
+  # L2 max_tokens 4000：industry_update 五节全文重写实测需 >2500，截断=白付输入费
   tiers:
     L1: {model: deepseek-flash, temperature: 0.1, max_tokens: 2000}
-    L2: {model: deepseek-chat, temperature: 0.3, max_tokens: 2500}
+    L2: {model: deepseek-chat, temperature: 0.3, max_tokens: 4000}
     L3: {model: deepseek-v4-pro, temperature: 0.3, max_tokens: 4000}
   prices:                     # ¥/百万 token（以 DeepSeek 官方定价页为准）
     deepseek-flash: {input_per_m: 1.0, output_per_m: 2.0}

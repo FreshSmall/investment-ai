@@ -9,22 +9,29 @@
 ```text
 每天 09:00 / 22:00（launchd）
   → 采集财联社+东财快讯（26h 回看窗口）
+  → 采集自选股官方公告（巨潮，L0 豁免——官方来源第一优先级）[V0.4]
   → L0 关键词过滤（正文-only 需 ≥2 个不同行业关键词）
     → 同题归并（标题 bigram Jaccard≥0.6 且最长公共子串≥10 字，近 48h 窗口+批内，最早发布者胜出）
     → 去重入库（MySQL: investment_ai）
   → L1 分类分级（deepseek-flash）→ P0/P1 深度分析（deepseek-chat）
-  → 日报写入 vault（P0 全量 + 最近 N 条 P1，N=pipeline.daily_p1_cap，超出在尾部提示）→ 晚间运行将日报刷新为全天版
+  → 行情快照（腾讯指数+东财板块，daily_snapshots 幂等）+ 市场复盘 [V0.3]
+  → 自选股命中分析（company_impact）[V0.2]
+  → Thesis 复盘（supporting/neutral/contradicting；状态流转代码强制：3 日强反证→weakened，证伪条件触发→falsified）[V0.2]
+  → 反方分析（Devil's Advocate：counter_points 上限 weak，不翻转状态）[V0.5]
+  → 行业长文档节级更新（industry_update：SECTION 协议+changelog 滚动 30 行）[V0.3]
+  → 日报（P0 全量+P1 截断 / 市场复盘 / 反方视角 / Thesis 复盘 / 自选股影响）→ 晚间刷新为全天版
+每周日 21:30（launchd）：weekly 复盘（L3 deepseek-v4-pro，Weekly/YYYY-Www.md，本周已生成则幂等跳过）[V0.5]
 ```
 
 | 资产 | 位置 |
 |------|------|
 | 代码 | `/Users/bjhl/IdeaProjects/learn-project/investment-ai`（git 管理，一 TASK 一提交） |
-| 生产库 | 阿里云 RDS 实例 · `investment_ai` 库（7 表，Alembic 管理） |
+| 生产库 | 阿里云 RDS 实例 · `investment_ai` 库（9 表：V0.1 七表 + companies + daily_snapshots，Alembic 管理） |
 | 测试库 | 同实例 · `investment_ai_test` 库（pytest 自动使用，可随时 DROP 重建） |
 | 凭证 | 项目根 `.env`（DB_* + LLM_API_KEY/LLM_BASE_URL，不入 git） |
 | Obsidian vault | `/Users/bjhl/GitRepository/Investment-KB`（可 git 管理） |
-| 日志 | `logs/YYYY-MM-DD.jsonl`（结构化，run_id 贯穿）+ `logs/daily-launchd.log`（调度输出） |
-| 调度 | launchd `com.investment-ai.daily`（每天 09:00/22:00，带 --force） |
+| 日志 | `logs/YYYY-MM-DD.jsonl`（结构化，run_id 贯穿）+ `logs/daily-launchd.log` / `weekly-launchd.log` |
+| 调度 | launchd `com.investment-ai.daily`（09:00/22:00 带 --force）+ `com.investment-ai.weekly`（周日 21:30） |
 
 ## 2. 日常操作
 
@@ -38,8 +45,11 @@
 # 手动补跑（当天已成功会 skip；--force 穿透，靠 UNIQUE 缓存零重复）
 .venv/bin/python main.py daily --force
 
-# Thesis 一览 / 种子导入
-.venv/bin/python main.py thesis list
+# 周报：手动生成/重生成本周（L3 调用，本周已生成则幂等跳过）
+.venv/bin/python main.py weekly [--force]
+
+# Thesis 一览 / 详情 / 人工恢复（falsified/weakened → active）/ 种子导入（theses+companies）
+.venv/bin/python main.py thesis list|show <id>|restore <id>|seed
 
 # 今晚的日报
 open /Users/bjhl/GitRepository/Investment-KB/Daily/$(date +%F).md
@@ -62,9 +72,12 @@ bash scripts/install_launchd.sh                         # 安装调度
 ```bash
 uv pip install -e ".[dev]"                              # 依赖变更时
 DB_NAME=investment_ai .venv/bin/alembic upgrade head    # 有新迁移时
-.venv/bin/pytest                                        # 回归（134 个，约 95s，需可达测试库）
-bash scripts/install_launchd.sh                         # plist 变更时重装（幂等）
+.venv/bin/python main.py thesis seed                    # 有新种子时（theses/companies 幂等 upsert）
+.venv/bin/pytest                                        # 回归（173 个，约 2min，需可达测试库）
+bash scripts/install_launchd.sh                         # plist 变更时重装（幂等，含 weekly job）
 ```
+
+**V0.2~V0.5 升级（2026-09-18）**：迁移 0002（companies 表 + analyses.thesis_id，uk_agg 收窄为四列）与 0003（daily_snapshots）；`thesis seed` 新增 10 只自选股；launchd 新增 weekly job。均为纯增量，可 downgrade。
 
 **配置调整**（不重启任何服务，CLI 进程每次冷启动读最新配置）：
 

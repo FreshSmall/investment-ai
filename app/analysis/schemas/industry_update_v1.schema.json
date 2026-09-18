@@ -15,7 +15,7 @@
         "required": ["name", "content", "changed"],
         "properties": {
           "name": {"type": "string", "enum": ["overview", "supply_demand", "catalysts", "risks", "metrics"]},
-          "content": {"type": "string", "minLength": 2, "maxLength": 1200},
+          "content": {"type": "string", "minLength": 2, "maxLength": 2000},
           "changed": {"type": "boolean"},
           "based_on_event_ids": {
             "type": "array",
@@ -33,7 +33,7 @@
         "additionalProperties": false,
         "required": ["change", "evidence_event_id"],
         "properties": {
-          "change": {"type": "string", "minLength": 4, "maxLength": 150},
+          "change": {"type": "string", "minLength": 4, "maxLength": 250},
           "evidence_event_id": {"type": "string", "pattern": "^[0-9a-f]{16}$"}
         }
       }

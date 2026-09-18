@@ -9,7 +9,7 @@
     "uncertainty", "follow_up_questions"
   ],
   "properties": {
-    "summary": {"type": "string", "minLength": 10, "maxLength": 300},
+    "summary": {"type": "string", "minLength": 10, "maxLength": 400},
     "facts": {
       "type": "array",
       "items": {

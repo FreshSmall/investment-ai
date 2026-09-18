@@ -84,7 +84,7 @@ class CompanyImpactStep(Step):
         stats: Dict = {
             "company_impacts": impacts,
             "watched": len(companies),
-            "hit_events": len(analyzed_events),
+            "analyzed_events": len(analyzed_events),  # 当日已分析事件基数（命中数为 company_impacts）
         }
         if budget_hit:
             stats["budget_hit"] = True

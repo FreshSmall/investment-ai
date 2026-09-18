@@ -5,10 +5,10 @@
   "additionalProperties": false,
   "required": ["market_summary", "sector_moves", "style_note", "risk_flags", "tomorrow_watch"],
   "properties": {
-    "market_summary": {"type": "string", "minLength": 8, "maxLength": 400},
+    "market_summary": {"type": "string", "minLength": 8, "maxLength": 600},
     "sector_moves": {
       "type": "array",
-      "maxItems": 6,
+      "maxItems": 10,
       "items": {
         "type": "object",
         "additionalProperties": false,
@@ -16,12 +16,12 @@
         "properties": {
           "sector": {"type": "string", "minLength": 2, "maxLength": 32},
           "direction": {"type": "string", "enum": ["up", "down"]},
-          "note": {"type": "string", "minLength": 2, "maxLength": 120}
+          "note": {"type": "string", "minLength": 2, "maxLength": 250}
         }
       }
     },
-    "style_note": {"type": "string", "minLength": 4, "maxLength": 200},
-    "risk_flags": {"type": "array", "maxItems": 4, "items": {"type": "string", "minLength": 2, "maxLength": 120}},
-    "tomorrow_watch": {"type": "array", "minItems": 1, "maxItems": 3, "items": {"type": "string", "minLength": 2, "maxLength": 120}}
+    "style_note": {"type": "string", "minLength": 4, "maxLength": 300},
+    "risk_flags": {"type": "array", "maxItems": 4, "items": {"type": "string", "minLength": 2, "maxLength": 200}},
+    "tomorrow_watch": {"type": "array", "minItems": 1, "maxItems": 3, "items": {"type": "string", "minLength": 2, "maxLength": 200}}
   }
 }

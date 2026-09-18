@@ -99,7 +99,11 @@ def test_scene4_vault_write_failure_partial_and_db_kept(rec_env, tmp_path) -> No
 
 
 def test_scene5_budget_hit_degrades_but_report_runs(rec_env) -> None:
-    """预算熔断：L2 分析顺延，日报照常产出。"""
+    """预算熔断：L2 分析顺延，日报照常产出。
+
+    BudgetGuard(0) 语义：首批免费(mock cost=0)调用后 add(0)>=0 即置 exceeded——
+    后续所有 LLM 调用熔断。因此分类只完成首个批次（动态取 batch_size），分析全顺延。
+    """
     from app.providers.llm.openai_compat import BudgetGuard
 
     ctx = rec_env
@@ -107,7 +111,7 @@ def test_scene5_budget_hit_degrades_but_report_runs(rec_env) -> None:
     summary = _run(ctx)
     assert summary.stats.get("budget_hit") is True
     assert summary.stats["events_analyzed"] == 0
-    assert summary.stats["events_classified"] == 9  # L1 不受熔断影响（分类先于分析）
+    assert summary.stats["events_classified"] == ctx.app_cfg.pipeline.classify_batch_size  # 仅首批逃过熔断门
     assert (ctx.vault_path / "Daily" / "2026-09-17.md").exists()
     assert summary.status.value == "success"
 
